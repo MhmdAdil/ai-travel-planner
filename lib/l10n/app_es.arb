@@ -1,0 +1,14 @@
+{
+  "@@locale": "es",
+  "appTitle": "Planificador de Viajes IA",
+  "navHome": "Inicio",
+  "navDiscover": "Descubrir",
+  "navItinerary": "Itinerario",
+  "navChat": "Chat",
+  "navProfile": "Perfil",
+  "homeTitle": "Inicio",
+  "discoverTitle": "Descubrir",
+  "itineraryTitle": "Itinerario",
+  "chatTitle": "Chat",
+  "profileTitle": "Perfil"
+}

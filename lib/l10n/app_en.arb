@@ -1,0 +1,17 @@
+{
+  "@@locale": "en",
+  "appTitle": "AI Travel Planner",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "navHome": "Home",
+  "navDiscover": "Discover",
+  "navItinerary": "Itinerary",
+  "navChat": "Chat",
+  "navProfile": "Profile",
+  "homeTitle": "Home",
+  "discoverTitle": "Discover",
+  "itineraryTitle": "Itinerary",
+  "chatTitle": "Chat",
+  "profileTitle": "Profile"
+}
