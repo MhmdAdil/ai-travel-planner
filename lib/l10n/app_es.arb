@@ -10,5 +10,22 @@
   "discoverTitle": "Descubrir",
   "itineraryTitle": "Itinerario",
   "chatTitle": "Chat",
-  "profileTitle": "Perfil"
+  "profileTitle": "Perfil",
+  "loginTitle": "Bienvenido de nuevo",
+  "loginSubtitle": "Inicia sesión para seguir planificando tus viajes",
+  "registerTitle": "Crear cuenta",
+  "registerSubtitle": "Regístrate para empezar a planificar tus viajes",
+  "emailLabel": "Correo electrónico",
+  "passwordLabel": "Contraseña",
+  "confirmPasswordLabel": "Confirmar contraseña",
+  "loginButton": "Iniciar sesión",
+  "registerButton": "Registrarse",
+  "noAccountPrompt": "¿No tienes una cuenta?",
+  "haveAccountPrompt": "¿Ya tienes una cuenta?",
+  "logoutButton": "Cerrar sesión",
+  "emailValidationError": "Introduce un correo electrónico válido",
+  "passwordValidationError": "La contraseña debe tener al menos 6 caracteres",
+  "confirmPasswordValidationError": "Las contraseñas no coinciden",
+  "genericAuthError": "Algo salió mal. Inténtalo de nuevo.",
+  "registerSuccessMessage": "Cuenta creada. Inicia sesión."
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
 
 void main() async {
@@ -20,7 +21,7 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
+      theme: AppTheme.light,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,

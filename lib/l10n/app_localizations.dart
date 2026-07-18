@@ -163,6 +163,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile'**
   String get profileTitle;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get loginTitle;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to keep planning your trips'**
+  String get loginSubtitle;
+
+  /// No description provided for @registerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get registerTitle;
+
+  /// No description provided for @registerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up to start planning your trips'**
+  String get registerSubtitle;
+
+  /// No description provided for @emailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get emailLabel;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// No description provided for @confirmPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm password'**
+  String get confirmPasswordLabel;
+
+  /// No description provided for @loginButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get loginButton;
+
+  /// No description provided for @registerButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign up'**
+  String get registerButton;
+
+  /// No description provided for @noAccountPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t have an account?'**
+  String get noAccountPrompt;
+
+  /// No description provided for @haveAccountPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get haveAccountPrompt;
+
+  /// No description provided for @logoutButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logoutButton;
+
+  /// No description provided for @emailValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address'**
+  String get emailValidationError;
+
+  /// No description provided for @passwordValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get passwordValidationError;
+
+  /// No description provided for @confirmPasswordValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get confirmPasswordValidationError;
+
+  /// No description provided for @genericAuthError.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get genericAuthError;
+
+  /// No description provided for @registerSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created. Please log in.'**
+  String get registerSuccessMessage;
 }
 
 class _AppLocalizationsDelegate

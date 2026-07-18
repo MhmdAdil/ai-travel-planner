@@ -40,4 +40,56 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileTitle => 'Profile';
+
+  @override
+  String get loginTitle => 'Welcome back';
+
+  @override
+  String get loginSubtitle => 'Log in to keep planning your trips';
+
+  @override
+  String get registerTitle => 'Create account';
+
+  @override
+  String get registerSubtitle => 'Sign up to start planning your trips';
+
+  @override
+  String get emailLabel => 'Email';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get confirmPasswordLabel => 'Confirm password';
+
+  @override
+  String get loginButton => 'Log in';
+
+  @override
+  String get registerButton => 'Sign up';
+
+  @override
+  String get noAccountPrompt => 'Don\'t have an account?';
+
+  @override
+  String get haveAccountPrompt => 'Already have an account?';
+
+  @override
+  String get logoutButton => 'Log out';
+
+  @override
+  String get emailValidationError => 'Enter a valid email address';
+
+  @override
+  String get passwordValidationError =>
+      'Password must be at least 6 characters';
+
+  @override
+  String get confirmPasswordValidationError => 'Passwords do not match';
+
+  @override
+  String get genericAuthError => 'Something went wrong. Please try again.';
+
+  @override
+  String get registerSuccessMessage => 'Account created. Please log in.';
 }
