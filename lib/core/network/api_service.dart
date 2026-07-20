@@ -28,6 +28,13 @@ class ApiService {
       data: {'email': email, 'password': password},
     );
   }
+
+  Future<Response<dynamic>> generateItinerary(Map<String, dynamic> preferences) {
+    return _dio.post(
+      ApiConfig.generateItineraryPath,
+      data: preferences,
+    );
+  }
 }
 
 final apiServiceProvider = Provider<ApiService>((ref) {
