@@ -35,6 +35,17 @@ class ApiService {
       data: preferences,
     );
   }
+
+  Future<Response<dynamic>> getNearbyPlaces({
+    required double lat,
+    required double lng,
+    required double radiusKm,
+  }) {
+    return _dio.get(
+      ApiConfig.nearbyPlacesPath,
+      queryParameters: {'lat': lat, 'lng': lng, 'radius': radiusKm},
+    );
+  }
 }
 
 final apiServiceProvider = Provider<ApiService>((ref) {

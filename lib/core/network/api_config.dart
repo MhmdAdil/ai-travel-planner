@@ -8,4 +8,5 @@ class ApiConfig {
   static const String loginPath = '/api/auth/login';
   static const String registerPath = '/api/auth/register';
   static const String generateItineraryPath = '/api/itinerary/generate';
+  static const String nearbyPlacesPath = '/api/places/nearby';
 }
