@@ -36,6 +36,10 @@ class ApiService {
     );
   }
 
+  Future<Response<dynamic>> getSavedItineraries() {
+    return _dio.get(ApiConfig.itinerariesPath);
+  }
+
   Future<Response<dynamic>> getNearbyPlaces({
     required double lat,
     required double lng,

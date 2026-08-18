@@ -10,6 +10,8 @@ final dioProvider = Provider<Dio>((ref) {
       baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
+      contentType: Headers.jsonContentType,
+      responseType: ResponseType.json,
     ),
   );
   dio.interceptors.add(

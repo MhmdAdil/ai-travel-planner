@@ -92,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     validator: (value) =>
-                        (value?.length ?? 0) >= 6 ? null : l10n.passwordValidationError,
+                        (value?.length ?? 0) >= 8 ? null : l10n.passwordValidationError,
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(

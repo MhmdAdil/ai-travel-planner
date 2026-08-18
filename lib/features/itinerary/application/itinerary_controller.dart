@@ -29,11 +29,11 @@ class ItineraryController extends Notifier<ItineraryState> {
     await generate(preference);
   }
 
-  void removePlace({required int dayIndex, required int placeIndex}) {
+  void removeItem({required int dayIndex, required int itemIndex}) {
     final itinerary = state.itinerary;
     if (itinerary == null) return;
     state = state.copyWith(
-      itinerary: itinerary.withPlaceRemoved(dayIndex: dayIndex, placeIndex: placeIndex),
+      itinerary: itinerary.withItemRemoved(dayIndex: dayIndex, itemIndex: itemIndex),
     );
   }
 

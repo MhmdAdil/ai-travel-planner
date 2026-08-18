@@ -27,7 +27,7 @@
   "haveAccountPrompt": "Already have an account?",
   "logoutButton": "Log out",
   "emailValidationError": "Enter a valid email address",
-  "passwordValidationError": "Password must be at least 6 characters",
+  "passwordValidationError": "Password must be at least 8 characters",
   "confirmPasswordValidationError": "Passwords do not match",
   "genericAuthError": "Something went wrong. Please try again.",
   "registerSuccessMessage": "Account created. Please log in."

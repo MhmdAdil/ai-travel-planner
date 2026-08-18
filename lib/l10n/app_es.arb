@@ -24,7 +24,7 @@
   "haveAccountPrompt": "¿Ya tienes una cuenta?",
   "logoutButton": "Cerrar sesión",
   "emailValidationError": "Introduce un correo electrónico válido",
-  "passwordValidationError": "La contraseña debe tener al menos 6 caracteres",
+  "passwordValidationError": "La contraseña debe tener al menos 8 caracteres",
   "confirmPasswordValidationError": "Las contraseñas no coinciden",
   "genericAuthError": "Algo salió mal. Inténtalo de nuevo.",
   "registerSuccessMessage": "Cuenta creada. Inicia sesión."

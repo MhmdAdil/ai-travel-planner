@@ -98,7 +98,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ),
                     validator: (value) =>
-                        (value?.length ?? 0) >= 6 ? null : l10n.passwordValidationError,
+                        (value?.length ?? 0) >= 8 ? null : l10n.passwordValidationError,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

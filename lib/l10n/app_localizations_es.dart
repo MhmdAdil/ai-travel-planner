@@ -84,7 +84,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get passwordValidationError =>
-      'La contraseña debe tener al menos 6 caracteres';
+      'La contraseña debe tener al menos 8 caracteres';
 
   @override
   String get confirmPasswordValidationError => 'Las contraseñas no coinciden';

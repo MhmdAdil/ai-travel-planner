@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: ai-travel-planner-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_travel_planner?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:development-only-secret-change-before-production-123456}
+    expiry: ${JWT_EXPIRY:60m}
+  currency:
+    lkr-per-usd: ${LKR_PER_USD:310.00}
