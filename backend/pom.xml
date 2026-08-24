@@ -13,7 +13,7 @@
 
     <groupId>com.aitravelplanner</groupId>
     <artifactId>ai-travel-planner-backend</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
     <name>AI Travel Planner Backend</name>
     <description>REST API for the AI itinerary travel planning mobile application</description>
 

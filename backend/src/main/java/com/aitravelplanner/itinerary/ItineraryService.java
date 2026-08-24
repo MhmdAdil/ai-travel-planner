@@ -110,7 +110,12 @@ public class ItineraryService {
                                         item.getDistanceKm(),
                                         item.getEstimatedCostLkr(),
                                         toUsd(item.getEstimatedCostLkr(), trip.getLkrPerUsd()),
-                                        item.getAlternatives()))
+                                        item.getAlternatives(),
+                                        item.getLatitude(),
+                                        item.getLongitude(),
+                                        item.getDataSource(),
+                                        item.getSourceReference(),
+                                        item.getSourceUrl()))
                                 .toList()))
                 .toList();
         BigDecimal difference = trip.getBudgetLkr().subtract(trip.getTotalCostLkr());
@@ -142,7 +147,10 @@ public class ItineraryService {
                 trip.getTransportMode(),
                 trip.getPace(),
                 trip.getStatus(),
-                "RULE_BASED_BASELINE",
+                trip.getGeneratorType(),
+                trip.getProviderNote(),
+                trip.getDestinationLatitude(),
+                trip.getDestinationLongitude(),
                 costSummary,
                 days,
                 trip.getCreatedAt());

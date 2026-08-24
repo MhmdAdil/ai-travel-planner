@@ -12,3 +12,5 @@ app:
   jwt:
     secret: test-secret-with-at-least-thirty-two-characters-123456
     expiry: 60m
+  places:
+    live-enabled: false

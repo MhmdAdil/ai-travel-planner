@@ -15,19 +15,26 @@ import org.springframework.stereotype.Component;
 @Component
 class ItineraryGenerator {
 
-    private final PlaceCatalog placeCatalog;
+    private final PlaceSearchService placeSearchService;
 
-    ItineraryGenerator(PlaceCatalog placeCatalog) {
-        this.placeCatalog = placeCatalog;
+    ItineraryGenerator(PlaceSearchService placeSearchService) {
+        this.placeSearchService = placeSearchService;
     }
 
     GenerationTotals generate(Trip trip, GenerateItineraryRequest request) {
-        List<PlaceTemplate> catalog = rankedPlaces(request);
+        PlaceSearchResult searchResult = placeSearchService.findPlaces(request.destinationRegion());
+        List<PlaceTemplate> catalog = rankedPlaces(request, searchResult.places());
+        trip.setPlaceSource(
+                searchResult.generatorType(),
+                searchResult.providerNote(),
+                searchResult.destinationLatitude(),
+                searchResult.destinationLongitude());
         int totalDays = (int) ChronoUnit.DAYS.between(
                 request.arrivalDateTime().toLocalDate(),
                 request.departureDateTime().toLocalDate()) + 1;
         int targetItems = itemsPerDay(request.pace());
         BigDecimal activityTotal = BigDecimal.ZERO;
+        int nextPlaceIndex = 0;
 
         for (int dayIndex = 0; dayIndex < totalDays; dayIndex++) {
             LocalDate date = request.arrivalDateTime().toLocalDate().plusDays(dayIndex);
@@ -46,9 +53,11 @@ class ItineraryGenerator {
                 }
             }
 
-            for (int itemIndex = 0; itemIndex < targetItems; itemIndex++) {
-                PlaceTemplate template = catalog.get((dayIndex * targetItems + itemIndex) % catalog.size());
-                int travelMinutes = itemIndex == 0 ? 0 : 30;
+            PlaceTemplate previousPlace = null;
+            for (int itemIndex = 0; itemIndex < targetItems && nextPlaceIndex < catalog.size(); itemIndex++) {
+                PlaceTemplate template = catalog.get(nextPlaceIndex);
+                BigDecimal legDistance = legDistance(previousPlace, template, searchResult);
+                int travelMinutes = travelMinutes(legDistance, request.transportMode());
                 LocalDateTime start = cursor.plusMinutes(travelMinutes);
                 LocalDateTime end = start.plusMinutes(template.visitMinutes());
                 if (end.isAfter(dayEnd)) {
@@ -64,13 +73,20 @@ class ItineraryGenerator {
                         template.name(),
                         template.category(),
                         template.description(),
-                        request.destinationRegion(),
+                        template.location(),
                         travelMinutes,
-                        template.distanceKm(),
+                        legDistance,
                         itemCost,
-                        alternatives));
+                        alternatives,
+                        template.latitude(),
+                        template.longitude(),
+                        template.dataSource(),
+                        template.sourceReference(),
+                        template.sourceUrl()));
                 activityTotal = activityTotal.add(itemCost);
                 cursor = end;
+                previousPlace = template;
+                nextPlaceIndex++;
             }
 
             if (day.getItems().isEmpty()) {
@@ -91,7 +107,12 @@ class ItineraryGenerator {
                         60,
                         BigDecimal.ZERO,
                         BigDecimal.ZERO,
-                        List.of()));
+                        List.of(),
+                        null,
+                        null,
+                        "SYSTEM",
+                        null,
+                        null));
             }
             trip.addDay(day);
         }
@@ -109,14 +130,18 @@ class ItineraryGenerator {
         return new GenerationTotals(accommodation, food, transport, activityTotal);
     }
 
-    private List<PlaceTemplate> rankedPlaces(GenerateItineraryRequest request) {
+    private List<PlaceTemplate> rankedPlaces(
+            GenerateItineraryRequest request,
+            List<PlaceTemplate> availablePlaces) {
         List<String> wanted = new ArrayList<>();
         wanted.addAll(request.interests());
         if (request.activities() != null) {
             wanted.addAll(request.activities());
         }
-        return placeCatalog.forRegion(request.destinationRegion()).stream()
-                .sorted(Comparator.comparingInt((PlaceTemplate place) -> matchScore(place, wanted)).reversed())
+        return availablePlaces.stream()
+                .sorted(Comparator
+                        .comparingInt((PlaceTemplate place) -> matchScore(place, wanted)).reversed()
+                        .thenComparing(PlaceTemplate::distanceKm))
                 .toList();
     }
 
@@ -124,17 +149,88 @@ class ItineraryGenerator {
         String searchable = (place.name() + " " + place.category() + " " + place.description())
                 .toLowerCase(Locale.ROOT);
         return (int) wanted.stream()
-                .map(value -> value.toLowerCase(Locale.ROOT))
+                .flatMap(value -> preferenceTokens(value).stream())
                 .filter(searchable::contains)
                 .count();
     }
 
+    private List<String> preferenceTokens(String preference) {
+        String value = preference.toLowerCase(Locale.ROOT);
+        if (value.contains("hik") || value.contains("adventure")) {
+            return List.of(value, "adventure", "nature", "peak", "viewpoint");
+        }
+        if (value.contains("beach") || value.contains("surf")) {
+            return List.of(value, "beach", "coast");
+        }
+        if (value.contains("culture")) {
+            return List.of(value, "culture", "temple", "museum", "worship");
+        }
+        if (value.contains("history")) {
+            return List.of(value, "history", "historic", "heritage", "museum");
+        }
+        if (value.contains("wildlife")) {
+            return List.of(value, "wildlife", "nature", "reserve", "zoo");
+        }
+        if (value.contains("food")) {
+            return List.of(value, "food", "restaurant", "cafe");
+        }
+        return List.of(value);
+    }
+
     private List<String> alternativeNames(List<PlaceTemplate> catalog, PlaceTemplate current) {
-        return catalog.stream()
+        List<String> sameCategory = catalog.stream()
                 .filter(place -> !place.name().equals(current.name()))
+                .filter(place -> place.category().equals(current.category()))
                 .limit(2)
                 .map(PlaceTemplate::name)
                 .toList();
+        if (sameCategory.size() == 2) return sameCategory;
+        List<String> alternatives = new ArrayList<>(sameCategory);
+        catalog.stream()
+                .filter(place -> !place.name().equals(current.name()))
+                .map(PlaceTemplate::name)
+                .filter(name -> !alternatives.contains(name))
+                .limit(2 - alternatives.size())
+                .forEach(alternatives::add);
+        return List.copyOf(alternatives);
+    }
+
+    private BigDecimal legDistance(
+            PlaceTemplate previous,
+            PlaceTemplate current,
+            PlaceSearchResult searchResult) {
+        if (current.latitude() == null || current.longitude() == null) {
+            return current.distanceKm();
+        }
+        double fromLatitude;
+        double fromLongitude;
+        if (previous != null && previous.latitude() != null && previous.longitude() != null) {
+            fromLatitude = previous.latitude();
+            fromLongitude = previous.longitude();
+        } else if (searchResult.destinationLatitude() != null && searchResult.destinationLongitude() != null) {
+            fromLatitude = searchResult.destinationLatitude();
+            fromLongitude = searchResult.destinationLongitude();
+        } else {
+            return current.distanceKm();
+        }
+        double earthRadiusKm = 6371.0088;
+        double latDistance = Math.toRadians(current.latitude() - fromLatitude);
+        double lonDistance = Math.toRadians(current.longitude() - fromLongitude);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(fromLatitude)) * Math.cos(Math.toRadians(current.latitude()))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double straightLine = earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return BigDecimal.valueOf(straightLine * 1.25).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int travelMinutes(BigDecimal distanceKm, String transportMode) {
+        if (distanceKm.signum() == 0) return 0;
+        String mode = transportMode.toLowerCase(Locale.ROOT);
+        double averageSpeed = mode.contains("walk") ? 5.0
+                : mode.contains("public") ? 24.0
+                : mode.contains("tuk") ? 28.0
+                : 35.0;
+        return Math.max(10, (int) Math.ceil(distanceKm.doubleValue() / averageSpeed * 60));
     }
 
     private int itemsPerDay(String pace) {

@@ -23,6 +23,9 @@ public record ItineraryResponse(
         String pace,
         TripStatus status,
         String generatorType,
+        String providerNote,
+        Double destinationLatitude,
+        Double destinationLongitude,
         CostSummaryResponse costSummary,
         List<ItineraryDayResponse> days,
         Instant createdAt) {

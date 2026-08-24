@@ -75,9 +75,11 @@ class ItineraryControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.destinationRegion").value("Kandy"))
-                .andExpect(jsonPath("$.generatorType").value("RULE_BASED_BASELINE"))
+                .andExpect(jsonPath("$.generatorType").value("FALLBACK_CATALOG"))
+                .andExpect(jsonPath("$.providerNote").isNotEmpty())
                 .andExpect(jsonPath("$.days.length()").value(3))
                 .andExpect(jsonPath("$.days[0].items[0].name").isNotEmpty())
+                .andExpect(jsonPath("$.days[0].items[0].dataSource").value("FALLBACK_CATALOG"))
                 .andExpect(jsonPath("$.costSummary.totalLkr").isNumber())
                 .andExpect(jsonPath("$.costSummary.totalUsd").isNumber())
                 .andExpect(jsonPath("$.costSummary.lkrPerUsd").value(310.0));

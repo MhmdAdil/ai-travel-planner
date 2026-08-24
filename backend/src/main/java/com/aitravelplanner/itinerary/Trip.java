@@ -108,6 +108,18 @@ public class Trip {
     @Column(name = "lkr_per_usd", nullable = false, precision = 10, scale = 4)
     private BigDecimal lkrPerUsd;
 
+    @Column(name = "generator_type", length = 40)
+    private String generatorType = "FALLBACK_CATALOG";
+
+    @Column(name = "provider_note", length = 300)
+    private String providerNote = "Development catalogue used.";
+
+    @Column(name = "destination_latitude")
+    private Double destinationLatitude;
+
+    @Column(name = "destination_longitude")
+    private Double destinationLongitude;
+
     @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("dayNumber ASC")
     private List<ItineraryDay> days = new ArrayList<>();
@@ -166,6 +178,17 @@ public class Trip {
         day.attachTo(this);
     }
 
+    public void setPlaceSource(
+            String generatorType,
+            String providerNote,
+            Double destinationLatitude,
+            Double destinationLongitude) {
+        this.generatorType = generatorType;
+        this.providerNote = providerNote;
+        this.destinationLatitude = destinationLatitude;
+        this.destinationLongitude = destinationLongitude;
+    }
+
     public void complete(
             BigDecimal accommodation,
             BigDecimal food,
@@ -204,4 +227,12 @@ public class Trip {
     public BigDecimal getLkrPerUsd() { return lkrPerUsd; }
     public List<ItineraryDay> getDays() { return List.copyOf(days); }
     public Instant getCreatedAt() { return createdAt; }
+    public String getGeneratorType() {
+        return generatorType == null ? "FALLBACK_CATALOG" : generatorType;
+    }
+    public String getProviderNote() {
+        return providerNote == null ? "Saved development catalogue itinerary." : providerNote;
+    }
+    public Double getDestinationLatitude() { return destinationLatitude; }
+    public Double getDestinationLongitude() { return destinationLongitude; }
 }

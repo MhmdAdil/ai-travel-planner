@@ -55,6 +55,21 @@ public class ItineraryItem {
     @Column(name = "estimated_cost_lkr", nullable = false, precision = 14, scale = 2)
     private BigDecimal estimatedCostLkr;
 
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
+    @Column(name = "data_source", length = 40)
+    private String dataSource;
+
+    @Column(name = "source_reference", length = 80)
+    private String sourceReference;
+
+    @Column(name = "source_url", length = 300)
+    private String sourceUrl;
+
     @ElementCollection
     @CollectionTable(name = "itinerary_item_alternatives", joinColumns = @JoinColumn(name = "item_id"))
     @Column(name = "alternative", nullable = false, length = 180)
@@ -73,7 +88,12 @@ public class ItineraryItem {
             int travelMinutes,
             BigDecimal distanceKm,
             BigDecimal estimatedCostLkr,
-            List<String> alternatives) {
+            List<String> alternatives,
+            Double latitude,
+            Double longitude,
+            String dataSource,
+            String sourceReference,
+            String sourceUrl) {
         this.startTime = startTime;
         this.endTime = endTime;
         this.name = name;
@@ -84,6 +104,11 @@ public class ItineraryItem {
         this.distanceKm = distanceKm;
         this.estimatedCostLkr = estimatedCostLkr;
         this.alternatives.addAll(alternatives);
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.dataSource = dataSource;
+        this.sourceReference = sourceReference;
+        this.sourceUrl = sourceUrl;
     }
 
     void attachTo(ItineraryDay day) {
@@ -100,4 +125,9 @@ public class ItineraryItem {
     public BigDecimal getDistanceKm() { return distanceKm; }
     public BigDecimal getEstimatedCostLkr() { return estimatedCostLkr; }
     public List<String> getAlternatives() { return List.copyOf(alternatives); }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
+    public String getDataSource() { return dataSource == null ? "FALLBACK_CATALOG" : dataSource; }
+    public String getSourceReference() { return sourceReference; }
+    public String getSourceUrl() { return sourceUrl; }
 }

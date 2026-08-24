@@ -22,3 +22,10 @@ app:
     expiry: ${JWT_EXPIRY:60m}
   currency:
     lkr-per-usd: ${LKR_PER_USD:310.00}
+  places:
+    live-enabled: ${PLACES_LIVE_ENABLED:true}
+    nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
+    overpass-url: ${OVERPASS_URL:https://overpass.private.coffee/api/interpreter}
+    routing-url: ${OSRM_URL:https://router.project-osrm.org}
+    user-agent: "${OSM_USER_AGENT:AITravelPlannerUniversityProject/0.3 (https://github.com/MhmdAdil/ai-travel-planner)}"
+    search-radius-metres: ${PLACE_SEARCH_RADIUS_METRES:30000}

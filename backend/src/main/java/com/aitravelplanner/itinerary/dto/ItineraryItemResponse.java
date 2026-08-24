@@ -15,5 +15,10 @@ public record ItineraryItemResponse(
         BigDecimal distanceKm,
         BigDecimal estimatedCostLkr,
         BigDecimal estimatedCostUsd,
-        List<String> alternatives) {
+        List<String> alternatives,
+        Double latitude,
+        Double longitude,
+        String dataSource,
+        String sourceReference,
+        String sourceUrl) {
 }

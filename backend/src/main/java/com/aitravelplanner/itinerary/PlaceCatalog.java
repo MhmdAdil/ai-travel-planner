@@ -15,9 +15,15 @@ class PlaceCatalog {
                 name,
                 category,
                 description,
+                "",
                 minutes,
                 BigDecimal.valueOf(cost),
-                BigDecimal.valueOf(distance));
+                BigDecimal.valueOf(distance),
+                null,
+                null,
+                "FALLBACK_CATALOG",
+                null,
+                null);
     }
 
     private final Map<String, List<PlaceTemplate>> catalog = Map.of(
@@ -72,6 +78,21 @@ class PlaceCatalog {
                     place("Palatupana Beach", "Beaches", "Relax on the wild coastline near Yala.", 120, 1000, 18.0)));
 
     List<PlaceTemplate> forRegion(String region) {
-        return catalog.getOrDefault(region.toLowerCase(Locale.ROOT), catalog.get("colombo"));
+        List<PlaceTemplate> places = catalog.getOrDefault(region.toLowerCase(Locale.ROOT), catalog.get("colombo"));
+        return places.stream()
+                .map(place -> new PlaceTemplate(
+                        place.name(),
+                        place.category(),
+                        place.description(),
+                        region,
+                        place.visitMinutes(),
+                        place.baseCostLkr(),
+                        place.distanceKm(),
+                        place.latitude(),
+                        place.longitude(),
+                        place.dataSource(),
+                        place.sourceReference(),
+                        place.sourceUrl()))
+                .toList();
     }
 }
