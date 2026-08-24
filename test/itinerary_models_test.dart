@@ -1,5 +1,6 @@
 import 'package:ai_travel_planner_frontend/features/itinerary/data/models/itinerary.dart';
 import 'package:ai_travel_planner_frontend/features/itinerary/data/models/trip_preference.dart';
+import 'package:ai_travel_planner_frontend/features/discover/data/models/place.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,7 +32,10 @@ void main() {
       'id': 10,
       'title': 'Kandy trip',
       'destinationRegion': 'Kandy',
-      'generatorType': 'RULE_BASED_BASELINE',
+      'generatorType': 'OPENSTREETMAP_LIVE',
+      'providerNote': 'Live places from OpenStreetMap.',
+      'destinationLatitude': 7.2906,
+      'destinationLongitude': 80.6337,
       'costSummary': {
         'accommodationLkr': 18000,
         'foodLkr': 6500,
@@ -65,6 +69,11 @@ void main() {
               'estimatedCostLkr': 3000,
               'estimatedCostUsd': 9.68,
               'alternatives': ['Kandy Lake Walk'],
+              'latitude': 7.2936,
+              'longitude': 80.6413,
+              'dataSource': 'OPENSTREETMAP',
+              'sourceReference': 'node/123',
+              'sourceUrl': 'https://www.openstreetmap.org/node/123',
             },
           ],
         },
@@ -75,5 +84,38 @@ void main() {
     expect(itinerary.days.first.items.first.alternatives, ['Kandy Lake Walk']);
     expect(itinerary.costSummary.totalLkr, 30000);
     expect(itinerary.costSummary.totalUsd, 96.77);
+    expect(itinerary.generatorType, 'OPENSTREETMAP_LIVE');
+    expect(itinerary.days.first.items.first.hasCoordinates, isTrue);
+    expect(itinerary.days.first.items.first.dataSource, 'OPENSTREETMAP');
+  });
+
+  test('nearby place parses live OSM evidence and fee status', () {
+    final place = Place.fromJson({
+      'id': 'node/123',
+      'name': 'Kandy Viewpoint',
+      'category': 'Adventure',
+      'description': 'Live place',
+      'averageCostLkr': null,
+      'averageCostUsd': null,
+      'feeStatus': 'UNKNOWN',
+      'feeDetails': 'Cost information is not available from OpenStreetMap.',
+      'address': 'Kandy',
+      'openingHours': '08:00-18:00',
+      'website': 'https://example.org',
+      'phone': '+94 00 000 0000',
+      'latitude': 7.30,
+      'longitude': 80.64,
+      'distanceKm': 1.4,
+      'dataSource': 'OPENSTREETMAP',
+      'sourceUrl': 'https://www.openstreetmap.org/node/123',
+    });
+
+    expect(place.name, 'Kandy Viewpoint');
+    expect(place.averageCostLkr, isNull);
+    expect(place.averageCostUsd, isNull);
+    expect(place.feeStatus, 'UNKNOWN');
+    expect(place.openingHours, '08:00-18:00');
+    expect(place.distanceKm, 1.4);
+    expect(place.dataSource, 'OPENSTREETMAP');
   });
 }

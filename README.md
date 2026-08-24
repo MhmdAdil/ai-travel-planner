@@ -47,7 +47,59 @@ Implemented:
 - Authenticated list/detail endpoints for saved itineraries
 - Backend integration tests and Flutter model tests
 
-Important: this milestone intentionally identifies the generator as `RULE_BASED_BASELINE`. It is not presented as trained AI. Live Geoapify/OpenStreetMap place enrichment, Gemini itinerary refinement, saved plan editing, and the separate XGBoost cost-prediction service are later milestones.
+## Milestone 3: live OpenStreetMap places
+
+Implemented:
+
+- Sri Lankan destination geocoding through the public Nominatim service
+- Live tourism, historic, natural-feature, cultural, food, shopping, recreation, sport, and wildlife POIs from Overpass API
+- Authenticated radius- and activity-based nearby discovery endpoint: `GET /api/places/nearby`
+  (`activities` is an optional comma-separated query parameter)
+- Preference-aware ranking using interests and activities
+- Real coordinates and OpenStreetMap element references stored with itinerary items
+- In-memory six-hour caching and Nominatim request throttling
+- Automatic fallback to the verified Milestone 2 catalogue when a public service is unavailable
+- Nationwide Discover continuity through a bundled 23,127-place, source-linked OpenStreetMap
+  index when public Overpass endpoints are unavailable; live Overpass remains the primary source
+- Duplicate-free scheduling until the available place set is exhausted
+- Approximate travel-leg distance and time calculated from place coordinates and transport mode
+- Map preview for each live itinerary place in Flutter
+- Visible live/fallback source information and OpenStreetMap attribution
+- In-map road directions from the current GPS point to a selected place, using OSRM route geometry
+- One-tap **Start navigation** that opens Google Maps turn-by-turn navigation for the selected coordinates
+- Distinct source-backed descriptions limited to 40 words, using an OSM description or linked
+  Wikipedia summary when available and a category/tag-based activity summary otherwise
+
+Important: `OPENSTREETMAP_LIVE` means that the place identity and coordinates came from OpenStreetMap. Visit durations, travel times and activity prices are still planning estimates. This milestone is not the XGBoost cost-prediction model.
+
+Discover does not invent entrance prices: it displays a published fee only when the linked source
+explicitly marks entry as free or supplies a charge. Otherwise it states that the price was not
+published by the source. Switching between 1 km,
+5 km and 10 km keeps the same GPS centre, so a wider-radius result preserves matching inner-radius
+places. Press Retry to obtain a fresh device location.
+
+The place-details panel uses **Get directions** to draw the road route directly on the current map.
+**Start navigation** opens the installed Google Maps application (or its supported web URL) with
+turn-by-turn driving navigation to the selected latitude and longitude. Descriptions are short and
+factual: an OSM description or linked Wikipedia summary is used when available; otherwise the app
+summarizes the mapped category and relevant tags into a place-specific activity description. It does
+not claim that swimming, surfing, hiking or another activity is safe unless the source supports it.
+Google Maps descriptions, reviews and prices are not copied into the OpenStreetMap dataset.
+
+The activity picker keeps the original Temples, Beaches, Nature & Parks, Museums & History,
+Food & Cafes, Adventure & Viewpoints and Attractions groups. It also supports Waterfalls, Rivers,
+Ponds & Lakes, Rocks & Caves, Mountains & Peaks, Farms, Forests, Shopping Malls, Water Parks,
+Wildlife & Zoos, Gardens, Camping & Picnics, Hiking & Trails, Cycling, Surfing & Water Sports,
+Boating & Marinas, Sports & Recreation, Cinemas & Theatres, Markets, Playgrounds and Hot Springs.
+
+Discover also continuously observes GPS changes and clears results from the previous city before
+requesting the new location. Late responses belonging to an old centre are discarded. Live OpenStreetMap discovery works
+wherever the selected activity is mapped. The bundled nationwide OSM index covers Sri Lanka rather
+than a fixed city list, so mapped records remain available during a public Overpass outage. Exact
+in-radius matches are preserved. If one selected activity has no named match inside the chosen
+radius, Discover reports a truthful zero result. It never adds markers from outside the selected
+circle. The backend and Flutter client both enforce the calculated distance, and the map draws the
+selected radius around the current GPS point. No location or distance is fabricated.
 
 ### Requirements
 
@@ -74,6 +126,14 @@ mvn spring-boot:run
 ```
 
 The API starts at `http://localhost:8080`. Run backend tests with `mvn test`. For Adil's XAMPP/MariaDB port `3307` setup, follow [backend/SETUP-WINDOWS.md](backend/SETUP-WINDOWS.md).
+
+Live place lookup is enabled by default. It can be disabled for offline demonstrations:
+
+```text
+PLACES_LIVE_ENABLED=false
+```
+
+The configurable endpoints are `NOMINATIM_URL` and `OVERPASS_URL`. `OSM_USER_AGENT` must continue to identify this application. The implementation caches geocoding results, limits public Nominatim requests to at most one per second, and does not implement prohibited autocomplete.
 
 ### Run Flutter
 
@@ -118,4 +178,4 @@ Login returns a response compatible with the Flutter client:
 
 ## Next milestone
 
-Add the Geoapify/OpenStreetMap provider adapter and use real place coordinates, opening information, routes, and travel times. Then add Gemini as a constrained itinerary-refinement layer over verified place data. Cost prediction remains a separate Python service using **XGBoost only** after a usable training dataset is identified and evaluated; Random Forest is excluded.
+Evaluate and prepare a defensible travel-cost dataset, then train and compare an **XGBoost-only** regression model using MAE, RMSE and R². Random Forest is excluded by the lecturer's requirement. The current rule-based cost estimates remain clearly labelled until that model is validated and integrated.
