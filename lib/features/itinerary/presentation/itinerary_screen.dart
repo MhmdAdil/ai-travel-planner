@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../trip_preference/presentation/trip_preference_screen.dart';
@@ -147,7 +149,7 @@ class _PlanHeader extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Rule-based baseline plan. Live places and AI refinement are added in the next milestone.',
+                    itinerary.providerNote,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -279,6 +281,9 @@ class _DaySection extends ConsumerWidget {
               final item = day.items[itemIndex];
               return _ItineraryItemCard(
                 item: item,
+                onShowMap: item.hasCoordinates
+                    ? () => _showPlaceMap(context, item)
+                    : null,
                 onRemove: () {
                   ref
                       .read(itineraryControllerProvider.notifier)
@@ -298,10 +303,15 @@ class _DaySection extends ConsumerWidget {
 }
 
 class _ItineraryItemCard extends StatelessWidget {
-  const _ItineraryItemCard({required this.item, required this.onRemove});
+  const _ItineraryItemCard({
+    required this.item,
+    required this.onRemove,
+    required this.onShowMap,
+  });
 
   final ItineraryItem item;
   final VoidCallback onRemove;
+  final VoidCallback? onShowMap;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -338,9 +348,27 @@ class _ItineraryItemCard extends StatelessWidget {
                               ),
                         ),
                         Text(item.category, style: const TextStyle(color: AppColors.teal)),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.dataSource == 'OPENSTREETMAP'
+                              ? 'Live place • OpenStreetMap'
+                              : item.dataSource == 'SYSTEM'
+                                  ? 'Schedule information'
+                                  : 'Verified fallback place',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Colors.grey.shade600,
+                              ),
+                        ),
                       ],
                     ),
                   ),
+                  if (onShowMap != null)
+                    IconButton(
+                      tooltip: 'Show on map',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.map_outlined, color: AppColors.teal),
+                      onPressed: onShowMap,
+                    ),
                   IconButton(
                     tooltip: 'Remove',
                     visualDensity: VisualDensity.compact,
@@ -406,3 +434,67 @@ class _Fact extends StatelessWidget {
 }
 
 String _shortTime(String value) => value.length >= 5 ? value.substring(0, 5) : value;
+
+void _showPlaceMap(BuildContext context, ItineraryItem item) {
+  final point = LatLng(item.latitude!, item.longitude!);
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.62,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.name, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 3),
+                  Text(item.location, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+            Expanded(
+              child: FlutterMap(
+                options: MapOptions(initialCenter: point, initialZoom: 14.5),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.ai_travel_planner_frontend',
+                  ),
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: point,
+                        width: 48,
+                        height: 48,
+                        child: const Icon(
+                          Icons.location_on,
+                          color: AppColors.orange,
+                          size: 46,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              child: Text(
+                '© OpenStreetMap contributors',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

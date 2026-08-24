@@ -14,4 +14,5 @@ class ApiConfig {
   static const String generateItineraryPath = '/api/itinerary/generate';
   static const String itinerariesPath = '/api/itinerary';
   static const String nearbyPlacesPath = '/api/places/nearby';
+  static const String placeRoutePath = '/api/places/route';
 }

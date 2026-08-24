@@ -53,6 +53,11 @@ class ItineraryItem {
     required this.estimatedCostLkr,
     required this.estimatedCostUsd,
     required this.alternatives,
+    required this.latitude,
+    required this.longitude,
+    required this.dataSource,
+    required this.sourceReference,
+    required this.sourceUrl,
   });
 
   final String startTime;
@@ -66,6 +71,13 @@ class ItineraryItem {
   final double estimatedCostLkr;
   final double estimatedCostUsd;
   final List<String> alternatives;
+  final double? latitude;
+  final double? longitude;
+  final String dataSource;
+  final String? sourceReference;
+  final String? sourceUrl;
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) => ItineraryItem(
         startTime: json['startTime']?.toString() ?? '',
@@ -81,6 +93,11 @@ class ItineraryItem {
         alternatives: (json['alternatives'] as List<dynamic>? ?? const [])
             .whereType<String>()
             .toList(),
+        latitude: _nullableNumber(json['latitude']),
+        longitude: _nullableNumber(json['longitude']),
+        dataSource: json['dataSource'] as String? ?? 'UNKNOWN',
+        sourceReference: json['sourceReference'] as String?,
+        sourceUrl: json['sourceUrl'] as String?,
       );
 }
 
@@ -134,6 +151,9 @@ class Itinerary {
     required this.title,
     required this.destinationRegion,
     required this.generatorType,
+    required this.providerNote,
+    required this.destinationLatitude,
+    required this.destinationLongitude,
     required this.costSummary,
     required List<ItineraryDay> days,
   }) : days = List.unmodifiable(days);
@@ -142,6 +162,9 @@ class Itinerary {
   final String title;
   final String destinationRegion;
   final String generatorType;
+  final String providerNote;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
   final CostSummary costSummary;
   final List<ItineraryDay> days;
 
@@ -152,6 +175,10 @@ class Itinerary {
       title: json['title'] as String? ?? 'Your trip',
       destinationRegion: json['destinationRegion'] as String? ?? '',
       generatorType: json['generatorType'] as String? ?? 'UNKNOWN',
+      providerNote: json['providerNote'] as String? ??
+          'Saved itinerary using the development place catalogue.',
+      destinationLatitude: _nullableNumber(json['destinationLatitude']),
+      destinationLongitude: _nullableNumber(json['destinationLongitude']),
       costSummary: CostSummary.fromJson(
         json['costSummary'] as Map<String, dynamic>? ?? const <String, dynamic>{},
       ),
@@ -167,6 +194,9 @@ class Itinerary {
         title: title,
         destinationRegion: destinationRegion,
         generatorType: generatorType,
+        providerNote: providerNote,
+        destinationLatitude: destinationLatitude,
+        destinationLongitude: destinationLongitude,
         costSummary: costSummary,
         days: [
           for (var i = 0; i < days.length; i++)
@@ -176,3 +206,4 @@ class Itinerary {
 }
 
 double _number(Object? value) => (value as num?)?.toDouble() ?? 0;
+double? _nullableNumber(Object? value) => (value as num?)?.toDouble();

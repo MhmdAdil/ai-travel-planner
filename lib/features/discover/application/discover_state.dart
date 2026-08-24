@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 
+import '../data/discover_activity_filters.dart';
 import '../data/models/place.dart';
 
 enum DiscoverStatus { loading, loaded, error }
@@ -13,6 +14,7 @@ class DiscoverState {
     this.errorMessage,
     this.locationDenied = false,
     this.usingDeviceLocation = false,
+    this.selectedActivityFilters = const {},
   });
 
   final LatLng center;
@@ -22,8 +24,18 @@ class DiscoverState {
   final String? errorMessage;
   final bool locationDenied;
   final bool usingDeviceLocation;
+  final Set<String> selectedActivityFilters;
 
   bool get isLoading => status == DiscoverStatus.loading;
+  bool get includesOpenDataFallback => places.any(
+        (place) => place.dataSource == 'OPENSTREETMAP_VERIFIED_SNAPSHOT' ||
+            place.dataSource == 'OPENSTREETMAP_OFFLINE' ||
+            place.dataSource == 'CURATED_OPEN_DATA',
+      );
+  List<Place> get visiblePlaces => places
+      .where((place) => place.distanceKm <= radiusKm)
+      .where((place) => matchesDiscoverActivityFilters(place.category, selectedActivityFilters))
+      .toList(growable: false);
 
   DiscoverState copyWith({
     LatLng? center,
@@ -33,6 +45,7 @@ class DiscoverState {
     String? errorMessage,
     bool? locationDenied,
     bool? usingDeviceLocation,
+    Set<String>? selectedActivityFilters,
   }) {
     return DiscoverState(
       center: center ?? this.center,
@@ -42,6 +55,7 @@ class DiscoverState {
       errorMessage: errorMessage,
       locationDenied: locationDenied ?? this.locationDenied,
       usingDeviceLocation: usingDeviceLocation ?? this.usingDeviceLocation,
+      selectedActivityFilters: selectedActivityFilters ?? this.selectedActivityFilters,
     );
   }
 }

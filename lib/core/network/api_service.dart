@@ -44,10 +44,33 @@ class ApiService {
     required double lat,
     required double lng,
     required double radiusKm,
+    Set<String> activityFilters = const {},
   }) {
     return _dio.get(
       ApiConfig.nearbyPlacesPath,
-      queryParameters: {'lat': lat, 'lng': lng, 'radius': radiusKm},
+      queryParameters: {
+        'lat': lat,
+        'lng': lng,
+        'radius': radiusKm,
+        if (activityFilters.isNotEmpty) 'activities': activityFilters.join(','),
+      },
+    );
+  }
+
+  Future<Response<dynamic>> getPlaceRoute({
+    required double startLat,
+    required double startLng,
+    required double endLat,
+    required double endLng,
+  }) {
+    return _dio.get(
+      ApiConfig.placeRoutePath,
+      queryParameters: {
+        'startLat': startLat,
+        'startLng': startLng,
+        'endLat': endLat,
+        'endLng': endLng,
+      },
     );
   }
 }
