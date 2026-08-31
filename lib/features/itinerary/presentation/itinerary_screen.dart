@@ -3,12 +3,15 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../cost_prediction/presentation/cost_prediction_card.dart';
 import '../../trip_preference/presentation/trip_preference_screen.dart';
 import '../application/itinerary_controller.dart';
 import '../application/itinerary_state.dart';
 import '../data/models/itinerary.dart';
+import 'itinerary_navigation_screen.dart';
 
 final _lkr = NumberFormat.currency(symbol: 'LKR ', decimalDigits: 0);
 final _usd = NumberFormat.currency(symbol: 'USD ', decimalDigits: 2);
@@ -117,7 +120,14 @@ class _ItineraryResultView extends ConsumerWidget {
           itemCount: itinerary.days.length + 2,
           itemBuilder: (context, index) {
             if (index == 0) return _PlanHeader(itinerary: itinerary);
-            if (index == 1) return _CostSummaryCard(summary: itinerary.costSummary);
+            if (index == 1) {
+              final preference = state.lastPreference;
+              if (preference == null) return const SizedBox.shrink();
+              return CostPredictionCard(
+                itinerary: itinerary,
+                preference: preference,
+              );
+            }
             final dayIndex = index - 2;
             return _DaySection(dayIndex: dayIndex, day: itinerary.days[dayIndex]);
           },
@@ -139,7 +149,9 @@ class _PlanHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${itinerary.days.length}-day plan for ${itinerary.destinationRegion}',
+              itinerary.generatorType == 'OPENSTREETMAP_PREFERENCE_ROUTE'
+                  ? '${itinerary.days.length}-day personalized Sri Lanka plan'
+                  : '${itinerary.days.length}-day plan for ${itinerary.destinationRegion}',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 6),
@@ -180,7 +192,7 @@ class _CostSummaryCard extends StatelessWidget {
               children: [
                 const Icon(Icons.account_balance_wallet_outlined, color: AppColors.teal),
                 const SizedBox(width: 8),
-                Text('Estimated trip cost', style: Theme.of(context).textTheme.titleMedium),
+                Text('Itinerary planning estimate', style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 14),
@@ -284,6 +296,16 @@ class _DaySection extends ConsumerWidget {
                 onShowMap: item.hasCoordinates
                     ? () => _showPlaceMap(context, item)
                     : null,
+                onAlternative: (alternative) {
+                  ref.read(itineraryControllerProvider.notifier).useAlternative(
+                        dayIndex: dayIndex,
+                        itemIndex: itemIndex,
+                        alternative: alternative,
+                      );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Changed to ${alternative.name}.')),
+                  );
+                },
                 onRemove: () {
                   ref
                       .read(itineraryControllerProvider.notifier)
@@ -307,11 +329,13 @@ class _ItineraryItemCard extends StatelessWidget {
     required this.item,
     required this.onRemove,
     required this.onShowMap,
+    required this.onAlternative,
   });
 
   final ItineraryItem item;
   final VoidCallback onRemove;
   final VoidCallback? onShowMap;
+  final ValueChanged<AlternativePlace> onAlternative;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -388,12 +412,43 @@ class _ItineraryItemCard extends StatelessWidget {
                 children: [
                   _Fact(icon: Icons.route, text: '${item.distanceKm.toStringAsFixed(1)} km'),
                   _Fact(icon: Icons.directions_car, text: '${item.travelMinutes} min travel'),
+                  _Fact(icon: Icons.schedule, text: '${item.visitMinutes} min activity'),
                   _Fact(
                     icon: Icons.payments_outlined,
                     text: '${_lkr.format(item.estimatedCostLkr)} (≈ ${_usd.format(item.estimatedCostUsd)})',
                   ),
                 ],
               ),
+              if (item.transportOptions.isNotEmpty) ...[
+                const Divider(height: 20),
+                Text('Transport options', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 6),
+                ...item.transportOptions.map((option) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.directions_transit, size: 17, color: AppColors.teal),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${option.type} • ${option.vehicleModel}',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '${option.serviceName} • up to ${option.capacity} people • ${option.estimatedMinutes} min • ${_lkr.format(option.estimatedFareLkr)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
               if (item.alternatives.isNotEmpty) ...[
                 const Divider(height: 20),
                 Text('Alternatives', style: Theme.of(context).textTheme.labelLarge),
@@ -402,10 +457,12 @@ class _ItineraryItemCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: item.alternatives
-                      .map((alternative) => Chip(
+                      .map((alternative) => ActionChip(
                             avatar: const Icon(Icons.swap_horiz, size: 16),
-                            label: Text(alternative),
+                            label: Text(alternative.name),
+                            tooltip: 'Replace this stop with ${alternative.name}',
                             visualDensity: VisualDensity.compact,
+                            onPressed: () => onAlternative(alternative),
                           ))
                       .toList(),
                 ),
@@ -434,6 +491,23 @@ class _Fact extends StatelessWidget {
 }
 
 String _shortTime(String value) => value.length >= 5 ? value.substring(0, 5) : value;
+
+Future<void> _openGoogleNavigation(ItineraryItem item) async {
+  if (!item.hasCoordinates) return;
+  final native = Uri.parse(
+    'google.navigation:q=${item.latitude},${item.longitude}&mode=d',
+  );
+  if (await canLaunchUrl(native)) {
+    await launchUrl(native, mode: LaunchMode.externalApplication);
+    return;
+  }
+  final web = Uri.https('www.google.com', '/maps/dir/', {
+    'api': '1',
+    'destination': '${item.latitude},${item.longitude}',
+    'travelmode': 'driving',
+  });
+  await launchUrl(web, mode: LaunchMode.externalApplication);
+}
 
 void _showPlaceMap(BuildContext context, ItineraryItem item) {
   final point = LatLng(item.latitude!, item.longitude!);
@@ -490,6 +564,37 @@ void _showPlaceMap(BuildContext context, ItineraryItem item) {
               child: Text(
                 '© OpenStreetMap contributors',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ItineraryNavigationScreen(
+                            destinationName: item.name,
+                            destinationLatitude: item.latitude!,
+                            destinationLongitude: item.longitude!,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Start OSM Navigation'),
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _openGoogleNavigation(item),
+                    icon: const Icon(Icons.navigation),
+                    label: const Text('Start Google Maps Navigation'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                  ),
+                ],
               ),
             ),
           ],

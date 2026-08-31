@@ -1,236 +1,409 @@
 package com.aitravelplanner.itinerary;
 
+import com.aitravelplanner.itinerary.AccommodationCatalog.AccommodationOption;
+import com.aitravelplanner.itinerary.NationwidePlaceCatalog.StartPoint;
+import com.aitravelplanner.itinerary.NationwidePlaceCatalog.TravelCandidate;
 import com.aitravelplanner.itinerary.dto.GenerateItineraryRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
 class ItineraryGenerator {
 
-    private final PlaceSearchService placeSearchService;
+    private static final double AIRPORT_LAT = 7.180756;
+    private static final double AIRPORT_LNG = 79.884117;
 
-    ItineraryGenerator(PlaceSearchService placeSearchService) {
+    private final NationwidePlaceCatalog nationwideCatalog;
+    private final AccommodationCatalog accommodationCatalog;
+    private final PlaceSearchService placeSearchService;
+    private final TransportPlanner transportPlanner;
+
+    ItineraryGenerator(
+            NationwidePlaceCatalog nationwideCatalog,
+            AccommodationCatalog accommodationCatalog,
+            PlaceSearchService placeSearchService,
+            TransportPlanner transportPlanner) {
+        this.nationwideCatalog = nationwideCatalog;
+        this.accommodationCatalog = accommodationCatalog;
         this.placeSearchService = placeSearchService;
+        this.transportPlanner = transportPlanner;
     }
 
     GenerationTotals generate(Trip trip, GenerateItineraryRequest request) {
-        PlaceSearchResult searchResult = placeSearchService.findPlaces(request.destinationRegion());
-        List<PlaceTemplate> catalog = rankedPlaces(request, searchResult.places());
-        trip.setPlaceSource(
-                searchResult.generatorType(),
-                searchResult.providerNote(),
-                searchResult.destinationLatitude(),
-                searchResult.destinationLongitude());
+        validateBudgetSufficiency(request);
+
         int totalDays = (int) ChronoUnit.DAYS.between(
                 request.arrivalDateTime().toLocalDate(),
                 request.departureDateTime().toLocalDate()) + 1;
         int targetItems = itemsPerDay(request.pace());
+
+        List<TravelCandidate> ranked = nationwideCatalog.rankedCandidates(request);
+        if (ranked.isEmpty()) {
+            return generateLegacyFallback(trip, request, totalDays, targetItems);
+        }
+
+        StartPoint start = nationwideCatalog.startPoint(request);
+        trip.setPlaceSource(
+                "OPENSTREETMAP_PREFERENCE_ROUTE",
+                "Sri Lanka OSM places matched to your selected place types and activities, then ordered from the nearest strong match to the next nearest strong match.",
+                start.latitude(),
+                start.longitude());
+
+        Set<String> used = new HashSet<>();
+        Set<String> coveredPreferences = new LinkedHashSet<>();
         BigDecimal activityTotal = BigDecimal.ZERO;
-        int nextPlaceIndex = 0;
+        BigDecimal transportTotal = BigDecimal.ZERO;
+        BigDecimal accommodationTotal = BigDecimal.ZERO;
+
+        double journeyLat = start.latitude();
+        double journeyLng = start.longitude();
 
         for (int dayIndex = 0; dayIndex < totalDays; dayIndex++) {
             LocalDate date = request.arrivalDateTime().toLocalDate().plusDays(dayIndex);
-            String theme = request.interests().get(dayIndex % request.interests().size());
-            ItineraryDay day = new ItineraryDay(dayIndex + 1, date, theme + " in " + request.destinationRegion());
+            boolean firstDay = dayIndex == 0;
+            boolean lastDay = dayIndex == totalDays - 1;
 
-            LocalDateTime cursor = date.atTime(8, 30);
-            if (dayIndex == 0 && request.arrivalDateTime().plusHours(1).isAfter(cursor)) {
-                cursor = request.arrivalDateTime().plusHours(1);
-            }
-            LocalDateTime dayEnd = date.atTime(19, 0);
-            if (dayIndex == totalDays - 1) {
-                LocalDateTime departureLimit = request.departureDateTime().minusHours(2);
-                if (departureLimit.isBefore(dayEnd)) {
-                    dayEnd = departureLimit;
-                }
+            ItineraryDay day = new ItineraryDay(
+                    dayIndex + 1,
+                    date,
+                    "Preference route • " + nationwideCatalog.regionFor(journeyLat, journeyLng));
+
+            LocalDateTime cursor = date.atTime(8, 0);
+            if (firstDay && request.arrivalDateTime().plusMinutes(45).isAfter(cursor)) {
+                cursor = request.arrivalDateTime().plusMinutes(45);
             }
 
-            PlaceTemplate previousPlace = null;
-            for (int itemIndex = 0; itemIndex < targetItems && nextPlaceIndex < catalog.size(); itemIndex++) {
-                PlaceTemplate template = catalog.get(nextPlaceIndex);
-                BigDecimal legDistance = legDistance(previousPlace, template, searchResult);
-                int travelMinutes = travelMinutes(legDistance, request.transportMode());
-                LocalDateTime start = cursor.plusMinutes(travelMinutes);
-                LocalDateTime end = start.plusMinutes(template.visitMinutes());
-                if (end.isAfter(dayEnd)) {
-                    break;
+            LocalDateTime dayEnd = date.atTime(19, 30);
+            if (lastDay) {
+                int airportReserve = request.returnToAirport() ? 180 : 120;
+                LocalDateTime departureLimit = request.departureDateTime().minusMinutes(airportReserve);
+                if (departureLimit.isBefore(dayEnd)) dayEnd = departureLimit;
+            }
+
+            // A late arrival should not receive unrealistic sightseeing. Go to nearby accommodation first.
+            if (firstDay && cursor.toLocalTime().isAfter(LocalTime.of(18, 0))) {
+                AccommodationOption stay = accommodationCatalog.nearest(
+                        journeyLat, journeyLng, request.budgetLevel(), request.groupSize());
+                BigDecimal distance = roadDistance(journeyLat, journeyLng, stay.latitude(), stay.longitude());
+                int travel = travelMinutes(distance, request.transportMode());
+                LocalDateTime checkIn = cursor.plusMinutes(travel);
+                day.addItem(accommodationItem(stay, cursor, checkIn.plusMinutes(60), distance, travel, request));
+                accommodationTotal = accommodationTotal.add(stay.estimatedNightCostLkr());
+                transportTotal = transportTotal.add(transportPlanner.preferredCost(null, stay.address(), distance, request.groupSize(), request.budgetLevel()));
+                journeyLat = stay.latitude();
+                journeyLng = stay.longitude();
+                trip.addDay(day);
+                continue;
+            }
+
+            int planned = 0;
+            int rejectedForTime = 0;
+            while (planned < targetItems && rejectedForTime < 80) {
+                final double fromLat = journeyLat;
+                final double fromLng = journeyLng;
+                TravelCandidate next = ranked.stream()
+                        .filter(candidate -> !used.contains(sourceKey(candidate.place())))
+                        .max(Comparator.comparingDouble(candidate -> selectionUtility(
+                                candidate, request, coveredPreferences, fromLat, fromLng)))
+                        .orElse(null);
+                if (next == null) break;
+
+                PlaceTemplate place = next.place();
+                BigDecimal distance = roadDistance(journeyLat, journeyLng, place.latitude(), place.longitude());
+                int travel = travelMinutes(distance, request.transportMode());
+                LocalDateTime startTime = cursor.plusMinutes(travel);
+                int visitMinutes = activityDurationMinutes(next);
+                LocalDateTime endTime = startTime.plusMinutes(visitMinutes);
+
+                if (endTime.isAfter(dayEnd)) {
+                    // Mark this place unavailable for the current plan rather than repeatedly testing it.
+                    used.add(sourceKey(place));
+                    rejectedForTime++;
+                    continue;
                 }
 
-                BigDecimal itemCost = adjustedActivityCost(template.baseCostLkr(), request.budgetLevel())
-                        .multiply(BigDecimal.valueOf(request.groupSize()));
-                List<String> alternatives = alternativeNames(catalog, template);
+                BigDecimal perPerson = nationwideCatalog.estimatedActivityCost(next, request.budgetLevel());
+                BigDecimal itemCost = perPerson.multiply(BigDecimal.valueOf(request.groupSize()));
+                List<String> alternatives = alternatives(ranked, next, used, request, place.latitude(), place.longitude());
+
+                String region = nationwideCatalog.regionFor(place.latitude(), place.longitude());
                 day.addItem(new ItineraryItem(
-                        start.toLocalTime(),
-                        end.toLocalTime(),
-                        template.name(),
-                        template.category(),
-                        template.description(),
-                        template.location(),
-                        travelMinutes,
-                        legDistance,
+                        startTime.toLocalTime(),
+                        endTime.toLocalTime(),
+                        place.name(),
+                        place.category(),
+                        itineraryDescription(next, request),
+                        region,
+                        travel,
+                        distance,
                         itemCost,
                         alternatives,
-                        template.latitude(),
-                        template.longitude(),
-                        template.dataSource(),
-                        template.sourceReference(),
-                        template.sourceUrl()));
+                        place.latitude(),
+                        place.longitude(),
+                        place.dataSource(),
+                        place.sourceReference(),
+                        place.sourceUrl()));
+
+                used.add(sourceKey(place));
+                coveredPreferences.addAll(nationwideCatalog.matchedPreferenceKeys(next, request));
                 activityTotal = activityTotal.add(itemCost);
-                cursor = end;
-                previousPlace = template;
-                nextPlaceIndex++;
+                transportTotal = transportTotal.add(transportPlanner.preferredCost(
+                        place.sourceReference(), region, distance, request.groupSize(), request.budgetLevel()));
+                journeyLat = place.latitude();
+                journeyLng = place.longitude();
+                cursor = endTime.plusMinutes(20);
+                planned++;
+            }
+
+            // Every night except the departure night receives a nearby accommodation recommendation.
+            if (!lastDay) {
+                AccommodationOption stay = accommodationCatalog.nearest(
+                        journeyLat, journeyLng, request.budgetLevel(), request.groupSize());
+                BigDecimal distance = roadDistance(journeyLat, journeyLng, stay.latitude(), stay.longitude());
+                int travel = travelMinutes(distance, request.transportMode());
+                LocalDateTime transferStart = cursor.isAfter(date.atTime(20, 0)) ? cursor : date.atTime(19, 30);
+                LocalDateTime checkIn = transferStart.plusMinutes(travel);
+                day.addItem(accommodationItem(stay, transferStart, checkIn.plusMinutes(45), distance, travel, request));
+                accommodationTotal = accommodationTotal.add(stay.estimatedNightCostLkr());
+                transportTotal = transportTotal.add(transportPlanner.preferredCost(null, stay.address(), distance, request.groupSize(), request.budgetLevel()));
+                journeyLat = stay.latitude();
+                journeyLng = stay.longitude();
+            }
+
+            if (lastDay && request.returnToAirport()) {
+                BigDecimal airportDistance = roadDistance(journeyLat, journeyLng, AIRPORT_LAT, AIRPORT_LNG);
+                int airportTravel = travelMinutes(airportDistance, request.transportMode());
+                LocalDateTime arriveAirport = request.departureDateTime().minusHours(2);
+                LocalDateTime leaveForAirport = arriveAirport.minusMinutes(airportTravel);
+                if (leaveForAirport.isBefore(date.atStartOfDay())) leaveForAirport = date.atStartOfDay();
+                day.addItem(new ItineraryItem(
+                        leaveForAirport.toLocalTime(),
+                        arriveAirport.toLocalTime(),
+                        "Travel to Bandaranaike International Airport (CMB)",
+                        "Airport Transfer",
+                        "Final transfer to CMB Airport, planned to arrive about two hours before departure.",
+                        "Katunayake",
+                        airportTravel,
+                        airportDistance,
+                        BigDecimal.ZERO,
+                        List.of(),
+                        AIRPORT_LAT,
+                        AIRPORT_LNG,
+                        "SYSTEM",
+                        null,
+                        "https://www.openstreetmap.org/?mlat=" + AIRPORT_LAT + "&mlon=" + AIRPORT_LNG));
+                transportTotal = transportTotal.add(transportPlanner.preferredCost(null, "Negombo / Katunayake", airportDistance, request.groupSize(), request.budgetLevel()));
             }
 
             if (day.getItems().isEmpty()) {
-                boolean arrivalDay = dayIndex == 0;
-                LocalDateTime anchor = arrivalDay
-                        ? request.arrivalDateTime()
-                        : request.departureDateTime().minusHours(2);
-                String name = arrivalDay ? "Arrival and accommodation check-in" : "Departure preparation and transfer";
-                day.addItem(new ItineraryItem(
-                        anchor.toLocalTime(),
-                        anchor.plusMinutes(60).toLocalTime(),
-                        name,
-                        "Travel",
-                        arrivalDay
-                                ? "Arrive, transfer from the starting point and settle into your accommodation."
-                                : "Check out and allow sufficient time to reach the departure point.",
-                        request.startLocation(),
-                        60,
-                        BigDecimal.ZERO,
-                        BigDecimal.ZERO,
-                        List.of(),
-                        null,
-                        null,
-                        "SYSTEM",
-                        null,
-                        null));
+                addTravelOrRestItem(day, request, dayIndex, nationwideCatalog.regionFor(journeyLat, journeyLng));
             }
             trip.addDay(day);
         }
 
-        int nights = Math.max(0, totalDays - 1);
-        int rooms = Math.max(1, (request.groupSize() + 1) / 2);
-        BigDecimal accommodation = accommodationRate(request.accommodationType(), request.budgetLevel())
-                .multiply(BigDecimal.valueOf(nights))
-                .multiply(BigDecimal.valueOf(rooms));
         BigDecimal food = dailyFoodRate(request.budgetLevel())
                 .multiply(BigDecimal.valueOf(totalDays))
                 .multiply(BigDecimal.valueOf(request.groupSize()));
-        BigDecimal transport = dailyTransportRate(request.transportMode(), request.budgetLevel())
+        BigDecimal minimumLocalTransport = dailyTransportRate(request.transportMode(), request.budgetLevel())
                 .multiply(BigDecimal.valueOf(totalDays));
-        return new GenerationTotals(accommodation, food, transport, activityTotal);
+        BigDecimal transport = transportTotal.max(minimumLocalTransport);
+
+        return new GenerationTotals(accommodationTotal, food, transport, activityTotal);
     }
 
-    private List<PlaceTemplate> rankedPlaces(
+    int activityDurationMinutes(TravelCandidate candidate) {
+        String category = candidate.place().category().toLowerCase(Locale.ROOT);
+        String activities = String.join(" ", candidate.activities()).toLowerCase(Locale.ROOT);
+        if (activities.contains("hiking") || activities.contains("trekking") || category.contains("hiking")) return 240;
+        if (activities.contains("safari") || category.contains("wildlife")) return 240;
+        if (activities.contains("surf") || category.contains("water sports")) return 180;
+        if (category.contains("beach")) return 150;
+        if (category.contains("temple") || category.contains("culture") || category.contains("history")) return 150;
+        if (category.contains("waterfall") || category.contains("forest") || category.contains("nature")) return 150;
+        if (category.contains("mountain") || category.contains("peak") || category.contains("adventure")) return 210;
+        if (category.contains("food") || category.contains("market")) return 90;
+        if (category.contains("museum") || category.contains("garden")) return 120;
+        return Math.max(105, candidate.place().visitMinutes());
+    }
+
+    private double selectionUtility(
+            TravelCandidate candidate,
             GenerateItineraryRequest request,
-            List<PlaceTemplate> availablePlaces) {
-        List<String> wanted = new ArrayList<>();
-        wanted.addAll(request.interests());
-        if (request.activities() != null) {
-            wanted.addAll(request.activities());
-        }
-        return availablePlaces.stream()
-                .sorted(Comparator
-                        .comparingInt((PlaceTemplate place) -> matchScore(place, wanted)).reversed()
-                        .thenComparing(PlaceTemplate::distanceKm))
-                .toList();
+            Set<String> covered,
+            double fromLat,
+            double fromLng) {
+        double distance = NationwidePlaceCatalog.distanceKm(
+                fromLat, fromLng, candidate.place().latitude(), candidate.place().longitude());
+        Set<String> matched = nationwideCatalog.matchedPreferenceKeys(candidate, request);
+        long uncovered = matched.stream().filter(key -> !covered.contains(key)).count();
+
+        // First cover the user's different selected preferences; after coverage, nearest strong matches win.
+        double score = candidate.score() * 25.0;
+        score += uncovered * 5_000.0;
+        if (uncovered == 0 && !matched.isEmpty()) score -= 2_500.0;
+        score -= distance * 12.0;
+        return score;
     }
 
-    private int matchScore(PlaceTemplate place, List<String> wanted) {
-        String searchable = (place.name() + " " + place.category() + " " + place.description())
-                .toLowerCase(Locale.ROOT);
-        return (int) wanted.stream()
-                .flatMap(value -> preferenceTokens(value).stream())
-                .filter(searchable::contains)
-                .count();
-    }
-
-    private List<String> preferenceTokens(String preference) {
-        String value = preference.toLowerCase(Locale.ROOT);
-        if (value.contains("hik") || value.contains("adventure")) {
-            return List.of(value, "adventure", "nature", "peak", "viewpoint");
-        }
-        if (value.contains("beach") || value.contains("surf")) {
-            return List.of(value, "beach", "coast");
-        }
-        if (value.contains("culture")) {
-            return List.of(value, "culture", "temple", "museum", "worship");
-        }
-        if (value.contains("history")) {
-            return List.of(value, "history", "historic", "heritage", "museum");
-        }
-        if (value.contains("wildlife")) {
-            return List.of(value, "wildlife", "nature", "reserve", "zoo");
-        }
-        if (value.contains("food")) {
-            return List.of(value, "food", "restaurant", "cafe");
-        }
-        return List.of(value);
-    }
-
-    private List<String> alternativeNames(List<PlaceTemplate> catalog, PlaceTemplate current) {
-        List<String> sameCategory = catalog.stream()
-                .filter(place -> !place.name().equals(current.name()))
-                .filter(place -> place.category().equals(current.category()))
+    private List<String> alternatives(
+            List<TravelCandidate> ranked,
+            TravelCandidate current,
+            Set<String> used,
+            GenerateItineraryRequest request,
+            double fromLat,
+            double fromLng) {
+        Set<String> currentMatches = nationwideCatalog.matchedPreferenceKeys(current, request);
+        return ranked.stream()
+                .filter(candidate -> !sourceKey(candidate.place()).equals(sourceKey(current.place())))
+                .filter(candidate -> !used.contains(sourceKey(candidate.place())))
+                .filter(candidate -> !java.util.Collections.disjoint(
+                        nationwideCatalog.matchedPreferenceKeys(candidate, request), currentMatches))
+                // Alternatives only need a small relevant pool; avoid sorting the entire dataset.
+                .limit(400)
+                .sorted(Comparator.comparingDouble((TravelCandidate candidate) ->
+                        NationwidePlaceCatalog.distanceKm(
+                                fromLat, fromLng, candidate.place().latitude(), candidate.place().longitude()))
+                        .thenComparing(Comparator.comparingInt(TravelCandidate::score).reversed()))
                 .limit(2)
-                .map(PlaceTemplate::name)
+                .map(candidate -> candidate.place().name())
                 .toList();
-        if (sameCategory.size() == 2) return sameCategory;
-        List<String> alternatives = new ArrayList<>(sameCategory);
-        catalog.stream()
-                .filter(place -> !place.name().equals(current.name()))
-                .map(PlaceTemplate::name)
-                .filter(name -> !alternatives.contains(name))
-                .limit(2 - alternatives.size())
-                .forEach(alternatives::add);
-        return List.copyOf(alternatives);
     }
 
-    private BigDecimal legDistance(
-            PlaceTemplate previous,
-            PlaceTemplate current,
-            PlaceSearchResult searchResult) {
-        if (current.latitude() == null || current.longitude() == null) {
-            return current.distanceKm();
-        }
-        double fromLatitude;
-        double fromLongitude;
-        if (previous != null && previous.latitude() != null && previous.longitude() != null) {
-            fromLatitude = previous.latitude();
-            fromLongitude = previous.longitude();
-        } else if (searchResult.destinationLatitude() != null && searchResult.destinationLongitude() != null) {
-            fromLatitude = searchResult.destinationLatitude();
-            fromLongitude = searchResult.destinationLongitude();
-        } else {
-            return current.distanceKm();
-        }
-        double earthRadiusKm = 6371.0088;
-        double latDistance = Math.toRadians(current.latitude() - fromLatitude);
-        double lonDistance = Math.toRadians(current.longitude() - fromLongitude);
-        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-                + Math.cos(Math.toRadians(fromLatitude)) * Math.cos(Math.toRadians(current.latitude()))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-        double straightLine = earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return BigDecimal.valueOf(straightLine * 1.25).setScale(2, RoundingMode.HALF_UP);
+    private ItineraryItem accommodationItem(
+            AccommodationOption stay,
+            LocalDateTime start,
+            LocalDateTime end,
+            BigDecimal distance,
+            int travelMinutes,
+            GenerateItineraryRequest request) {
+        return new ItineraryItem(
+                start.toLocalTime(),
+                end.toLocalTime(),
+                stay.name(),
+                "Accommodation",
+                "Nearby overnight stay recommendation: " + stay.type()
+                        + ". " + stay.address()
+                        + ". The displayed night cost is a planning estimate; confirm the live room price before booking.",
+                stay.address(),
+                travelMinutes,
+                distance,
+                stay.estimatedNightCostLkr(),
+                accommodationCatalog.alternatives(
+                                stay.latitude(),
+                                stay.longitude(),
+                                request.budgetLevel(),
+                                request.groupSize(),
+                                stay.name(),
+                                2)
+                        .stream()
+                        .map(AccommodationOption::name)
+                        .toList(),
+                stay.latitude(),
+                stay.longitude(),
+                "SRI_LANKA_OPEN_DATA",
+                null,
+                null);
+    }
+
+    private String itineraryDescription(TravelCandidate candidate, GenerateItineraryRequest request) {
+        List<String> selectedMatches = new ArrayList<>();
+        Set<String> keys = nationwideCatalog.matchedPreferenceKeys(candidate, request);
+        for (String key : keys) selectedMatches.add(key.substring(key.indexOf(':') + 1));
+        String activities = String.join(", ", candidate.activities().stream().limit(3).toList());
+        String reason = selectedMatches.isEmpty() ? "your preferences" : String.join(", ", selectedMatches);
+        String base = candidate.place().description();
+        if (base == null || base.isBlank()) base = candidate.place().name() + " is a mapped Sri Lankan place.";
+        return ShortDescription.limit(base + " Matched: " + reason + ". Suggested activities: " + activities + ".", 46);
+    }
+
+    private BigDecimal roadDistance(double fromLat, double fromLng, double toLat, double toLng) {
+        double roadApproximation = NationwidePlaceCatalog.distanceKm(fromLat, fromLng, toLat, toLng) * 1.22;
+        return BigDecimal.valueOf(roadApproximation).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String sourceKey(PlaceTemplate place) {
+        if (place.sourceReference() != null && !place.sourceReference().isBlank()) return place.sourceReference();
+        return place.name() + "@" + place.latitude() + "," + place.longitude();
     }
 
     private int travelMinutes(BigDecimal distanceKm, String transportMode) {
-        if (distanceKm.signum() == 0) return 0;
+        if (distanceKm.signum() <= 0) return 0;
         String mode = transportMode.toLowerCase(Locale.ROOT);
-        double averageSpeed = mode.contains("walk") ? 5.0
-                : mode.contains("public") ? 24.0
+        double speed = mode.contains("walk") ? 5.0
+                : mode.contains("public") || mode.contains("bus") || mode.contains("train") ? 32.0
                 : mode.contains("tuk") ? 28.0
+                : 42.0;
+        return Math.max(10, (int) Math.ceil(distanceKm.doubleValue() / speed * 60));
+    }
+
+    private BigDecimal estimatedLegTransportCost(BigDecimal distanceKm, String mode) {
+        String value = mode.toLowerCase(Locale.ROOT);
+        double rate = value.contains("public") || value.contains("bus") || value.contains("train") ? 18.0
+                : value.contains("tuk") ? 85.0
+                : value.contains("private") || value.contains("rental") ? 120.0
                 : 35.0;
-        return Math.max(10, (int) Math.ceil(distanceKm.doubleValue() / averageSpeed * 60));
+        return BigDecimal.valueOf(distanceKm.doubleValue() * rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void addTravelOrRestItem(
+            ItineraryDay day, GenerateItineraryRequest request, int dayIndex, String region) {
+        LocalDateTime anchor = dayIndex == 0 ? request.arrivalDateTime() : day.getDate().atTime(9, 0);
+        day.addItem(new ItineraryItem(
+                anchor.toLocalTime(), anchor.plusMinutes(90).toLocalTime(),
+                dayIndex == 0 ? "Arrival, transfer and check-in" : "Regional transfer and flexible time",
+                "Travel",
+                "Use this time for transfer, check-in, meals and rest before the next recommended activities.",
+                region, 90, BigDecimal.ZERO, BigDecimal.ZERO, List.of(),
+                null, null, "SYSTEM", null, null));
+    }
+
+    private GenerationTotals generateLegacyFallback(
+            Trip trip, GenerateItineraryRequest request, int totalDays, int targetItems) {
+        PlaceSearchResult search = placeSearchService.findPlaces(
+                request.destinationRegion(), request.latitude(), request.longitude());
+        trip.setPlaceSource(search.generatorType(), search.providerNote(),
+                search.destinationLatitude(), search.destinationLongitude());
+        BigDecimal activities = BigDecimal.ZERO;
+        int index = 0;
+        for (int dayIndex = 0; dayIndex < totalDays; dayIndex++) {
+            LocalDate date = request.arrivalDateTime().toLocalDate().plusDays(dayIndex);
+            ItineraryDay day = new ItineraryDay(dayIndex + 1, date,
+                    request.interests().get(dayIndex % request.interests().size()) + " • " + request.destinationRegion());
+            LocalDateTime cursor = date.atTime(9, 0);
+            for (int i = 0; i < targetItems && index < search.places().size(); i++, index++) {
+                PlaceTemplate place = search.places().get(index);
+                LocalDateTime end = cursor.plusMinutes(place.visitMinutes());
+                BigDecimal cost = place.baseCostLkr().multiply(BigDecimal.valueOf(request.groupSize()));
+                day.addItem(new ItineraryItem(cursor.toLocalTime(), end.toLocalTime(), place.name(), place.category(),
+                        place.description(), place.location(), 0, place.distanceKm(), cost, List.of(),
+                        place.latitude(), place.longitude(), place.dataSource(), place.sourceReference(), place.sourceUrl()));
+                activities = activities.add(cost);
+                cursor = end.plusMinutes(30);
+            }
+            if (day.getItems().isEmpty()) addTravelOrRestItem(day, request, dayIndex, request.destinationRegion());
+            trip.addDay(day);
+        }
+        int nights = Math.max(0, totalDays - 1);
+        int rooms = Math.max(1, (request.groupSize() + 1) / 2);
+        return new GenerationTotals(
+                accommodationRate(request.accommodationType(), request.budgetLevel())
+                        .multiply(BigDecimal.valueOf(nights)).multiply(BigDecimal.valueOf(rooms)),
+                dailyFoodRate(request.budgetLevel()).multiply(BigDecimal.valueOf(totalDays))
+                        .multiply(BigDecimal.valueOf(request.groupSize())),
+                dailyTransportRate(request.transportMode(), request.budgetLevel()).multiply(BigDecimal.valueOf(totalDays)),
+                activities);
     }
 
     private int itemsPerDay(String pace) {
@@ -241,53 +414,53 @@ class ItineraryGenerator {
         };
     }
 
-    private BigDecimal adjustedActivityCost(BigDecimal base, BudgetLevel level) {
-        return base.multiply(switch (level) {
-            case LOW -> BigDecimal.valueOf(0.80);
-            case MID -> BigDecimal.ONE;
-            case HIGH -> BigDecimal.valueOf(1.25);
-        }).setScale(2, RoundingMode.HALF_UP);
-    }
-
     private BigDecimal accommodationRate(String type, BudgetLevel level) {
         String value = type.toLowerCase(Locale.ROOT);
-        if (value.contains("luxury") || value.contains("4") || value.contains("5")) {
-            return BigDecimal.valueOf(45000);
-        }
-        if (value.contains("mid") || value.contains("3")) {
-            return BigDecimal.valueOf(18000);
-        }
+        if (value.contains("luxury") || value.contains("4") || value.contains("5")) return BigDecimal.valueOf(55000);
+        if (value.contains("mid") || value.contains("3")) return BigDecimal.valueOf(18000);
         return switch (level) {
-            case LOW -> BigDecimal.valueOf(7000);
+            case LOW -> BigDecimal.valueOf(6500);
             case MID -> BigDecimal.valueOf(15000);
-            case HIGH -> BigDecimal.valueOf(30000);
+            case HIGH -> BigDecimal.valueOf(40000);
         };
     }
 
     private BigDecimal dailyFoodRate(BudgetLevel level) {
         return switch (level) {
-            case LOW -> BigDecimal.valueOf(3500);
-            case MID -> BigDecimal.valueOf(6500);
-            case HIGH -> BigDecimal.valueOf(12000);
+            case LOW -> BigDecimal.valueOf(2500);
+            case MID -> BigDecimal.valueOf(5000);
+            case HIGH -> BigDecimal.valueOf(10000);
         };
     }
 
     private BigDecimal dailyTransportRate(String mode, BudgetLevel level) {
         String value = mode.toLowerCase(Locale.ROOT);
-        if (value.contains("public")) return BigDecimal.valueOf(2500);
+        if (value.contains("public") || value.contains("bus") || value.contains("train")) return BigDecimal.valueOf(2000);
         if (value.contains("tuk")) return BigDecimal.valueOf(4500);
         if (value.contains("rental") || value.contains("private")) return BigDecimal.valueOf(12000);
         return switch (level) {
-            case LOW -> BigDecimal.valueOf(3000);
+            case LOW -> BigDecimal.valueOf(2500);
             case MID -> BigDecimal.valueOf(6000);
-            case HIGH -> BigDecimal.valueOf(12000);
+            case HIGH -> BigDecimal.valueOf(15000);
         };
     }
 
-    record GenerationTotals(
-            BigDecimal accommodation,
-            BigDecimal food,
-            BigDecimal transport,
-            BigDecimal activities) {
+    private void validateBudgetSufficiency(GenerateItineraryRequest request) {
+        long days = ChronoUnit.DAYS.between(
+                request.arrivalDateTime().toLocalDate(), request.departureDateTime().toLocalDate()) + 1;
+        BigDecimal baselinePerDayPerPerson = switch (request.budgetLevel()) {
+            case LOW -> BigDecimal.valueOf(5500);
+            case MID -> BigDecimal.valueOf(11000);
+            case HIGH -> BigDecimal.valueOf(24000);
+        };
+        BigDecimal minimum = baselinePerDayPerPerson.multiply(BigDecimal.valueOf(days))
+                .multiply(BigDecimal.valueOf(request.groupSize()));
+        if (request.budgetLkr().compareTo(minimum) < 0) {
+            throw new InvalidTripRequestException(
+                    "Budget is too low for the selected duration, traveller count and budget level. "
+                            + "A practical minimum estimate is LKR " + minimum.toBigInteger() + ".");
+        }
     }
+
+    record GenerationTotals(BigDecimal accommodation, BigDecimal food, BigDecimal transport, BigDecimal activities) {}
 }

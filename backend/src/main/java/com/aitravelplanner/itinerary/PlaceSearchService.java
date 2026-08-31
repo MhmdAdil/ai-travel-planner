@@ -24,10 +24,18 @@ class PlaceSearchService {
         this.liveEnabled = liveEnabled;
     }
 
-    PlaceSearchResult findPlaces(String destinationRegion) {
+    PlaceSearchResult findPlaces(String destinationRegion, Double lat, Double lng) {
         if (liveEnabled) {
             try {
-                OsmPlaceClient.LivePlaceResult live = osmPlaceClient.find(destinationRegion);
+                OsmPlaceClient.LivePlaceResult live;
+                if (lat != null && lng != null) {
+                    List<PlaceTemplate> places = osmPlaceClient.findNearby(lat, lng, 30.0);
+                    live = new OsmPlaceClient.LivePlaceResult(
+                            new OsmPlaceClient.DestinationPoint(destinationRegion, lat, lng),
+                            places);
+                } else {
+                    live = osmPlaceClient.find(destinationRegion);
+                }
                 return new PlaceSearchResult(
                         live.places(),
                         "OPENSTREETMAP_LIVE",

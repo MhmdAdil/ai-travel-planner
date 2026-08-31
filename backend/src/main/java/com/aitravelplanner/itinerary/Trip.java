@@ -235,4 +235,12 @@ public class Trip {
     }
     public Double getDestinationLatitude() { return destinationLatitude; }
     public Double getDestinationLongitude() { return destinationLongitude; }
+
+    public void setDestinationLatitude(Double destinationLatitude) {
+        this.destinationLatitude = destinationLatitude;
+    }
+
+    public void setDestinationLongitude(Double destinationLongitude) {
+        this.destinationLongitude = destinationLongitude;
+    }
 }

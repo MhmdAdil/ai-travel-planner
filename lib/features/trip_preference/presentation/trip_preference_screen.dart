@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../itinerary/application/itinerary_controller.dart';
 import '../../itinerary/data/models/trip_preference.dart';
 import '../data/trip_preference_options.dart';
+import '../data/travel_region_options.dart';
 
 class TripPreferenceScreen extends ConsumerStatefulWidget {
   const TripPreferenceScreen({super.key});
@@ -23,12 +25,17 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
   final _notesController = TextEditingController();
 
   String? _selectedRegion;
+  double? _latitude;
+  double? _longitude;
   String _budgetLevel = 'MID';
   int _groupSize = 1;
-  String _accommodation = TripPreferenceOptions.accommodationTypes[1];
+  String _accommodation = TripPreferenceOptions.midAccommodationTypes[4];
   String _foodPreference = TripPreferenceOptions.foodPreferences.first;
-  String _transportMode = TripPreferenceOptions.transportModes.first;
+  String _transportMode = TripPreferenceOptions.transportModesFor('MID', 1).first;
   String _pace = 'Balanced';
+  bool _returnToAirport = false;
+  bool _isFetchingLocation = false;
+  final Set<String> _selectedTravelRegions = {};
   final Set<String> _selectedInterests = {};
   final Set<String> _selectedActivities = {};
 
@@ -108,8 +115,42 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
+  List<String> get _availableInterests => TravelRegionOptions.placesFor(_selectedTravelRegions);
+
+  List<String> get _availableActivities =>
+      TravelRegionOptions.activitiesFor(_selectedTravelRegions, _selectedInterests);
+
+
+  List<String> get _availableAccommodationTypes =>
+      TripPreferenceOptions.accommodationTypesForBudget(_budgetLevel);
+
+  List<String> get _availableTransportModes =>
+      TripPreferenceOptions.transportModesFor(_budgetLevel, _groupSize);
+
+  void _refreshBudgetDependentSelections() {
+    final accommodationOptions = _availableAccommodationTypes;
+    if (!accommodationOptions.contains(_accommodation)) {
+      _accommodation = accommodationOptions.first;
+    }
+    final transportOptions = _availableTransportModes;
+    if (!transportOptions.contains(_transportMode)) {
+      _transportMode = transportOptions.first;
+    }
+  }
+
+  void _refreshRegionDependentSelections() {
+    final allowedPlaces = _availableInterests.toSet();
+    _selectedInterests.removeWhere((value) => !allowedPlaces.contains(value));
+    final allowedActivities = _availableActivities.toSet();
+    _selectedActivities.removeWhere((value) => !allowedActivities.contains(value));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedTravelRegions.isEmpty) {
+      _showMessage('Please select at least one travel region.');
+      return;
+    }
     if (_selectedInterests.isEmpty) {
       _showMessage('Please select at least one place interest.');
       return;
@@ -123,14 +164,23 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
       return;
     }
 
+    final budgetLkr = double.parse(_budgetController.text.trim());
+    final minBudget = _calculateMinimumBudget();
+    if (budgetLkr < minBudget) {
+      _showMessage(
+          'Budget of LKR ${budgetLkr.toStringAsFixed(0)} is insufficient for this trip. Minimum recommended: LKR ${minBudget.toStringAsFixed(0)}');
+      return;
+    }
+
     final preference = TripPreference(
       destinationRegion: _selectedRegion!,
       startLocation: _startLocationController.text.trim(),
       arrivalDateTime: _arrivalDateTime,
       departureDateTime: _departureDateTime,
       budgetLevel: _budgetLevel,
-      budgetLkr: double.parse(_budgetController.text.trim()),
+      budgetLkr: budgetLkr,
       groupSize: _groupSize,
+      travelRegions: _selectedTravelRegions.toList(),
       interests: _selectedInterests.toList(),
       activities: _selectedActivities.toList(),
       accommodationType: _accommodation,
@@ -138,8 +188,77 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
       transportMode: _transportMode,
       pace: _pace,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      latitude: _latitude,
+      longitude: _longitude,
+      returnToAirport: _returnToAirport,
     );
     await ref.read(itineraryControllerProvider.notifier).generate(preference);
+  }
+
+  double _calculateMinimumBudget() {
+    double minDaily = switch (_budgetLevel) {
+      'LOW' => 15000,
+      'MID' => 35000,
+      'HIGH' => 90000,
+      _ => 35000,
+    };
+    // Shared costs for groups
+    double groupFactor = _groupSize <= 2 ? 1.0 : (_groupSize + 1) / 2.0;
+    return minDaily * _durationDays * groupFactor;
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showMessage('Location services are disabled.');
+      if (mounted) setState(() => _selectedRegion = null);
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showMessage('Location permissions are denied');
+        if (mounted) setState(() => _selectedRegion = null);
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showMessage('Location permissions are permanently denied.');
+      if (mounted) setState(() => _selectedRegion = null);
+      return;
+    }
+
+    try {
+      setState(() {
+        _selectedRegion = 'Current Location';
+        _isFetchingLocation = true;
+      });
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _selectedRegion = 'Current Location';
+        _startLocationController.text =
+            'Current location (${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)})';
+        _isFetchingLocation = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Failed to fetch current location. Please try again.');
+      setState(() {
+        _isFetchingLocation = false;
+        _latitude = null;
+        _longitude = null;
+        _selectedRegion = null;
+      });
+    }
   }
 
   void _showMessage(String message) {
@@ -166,21 +285,40 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                 Text('Tell us about your journey', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 6),
                 Text(
-                  'Your arrival and departure days are included in the day-by-day plan.',
+                  'Choose your start/current location and preferences. The planner can recommend matching regions across Sri Lanka.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 24),
                 _sectionTitle(context, 'Route and timing'),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedRegion,
+                  value: _selectedRegion,
+                  isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Destination region',
+                    labelText: 'Starting region / current location',
                     prefixIcon: Icon(Icons.place_outlined),
                   ),
                   items: TripPreferenceOptions.regions
                       .map((region) => DropdownMenuItem(value: region, child: Text(region)))
                       .toList(),
-                  onChanged: isLoading ? null : (value) => setState(() => _selectedRegion = value),
+                  onChanged: isLoading
+                      ? null
+                      : (value) {
+                          if (value == 'Current Location') {
+                            setState(() => _selectedRegion = 'Current Location');
+                            _fetchCurrentLocation();
+                          } else {
+                            setState(() {
+                              _selectedRegion = value;
+                              if (value == 'Bandaranaike International Airport Arrivals') {
+                                _startLocationController.text = 'Bandaranaike International Airport';
+                              } else {
+                                _startLocationController.text = value ?? '';
+                              }
+                              _latitude = null;
+                              _longitude = null;
+                            });
+                          }
+                        },
                   validator: (value) => value == null ? 'Please select a region.' : null,
                 ),
                 const SizedBox(height: 12),
@@ -219,6 +357,28 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                         ),
                   ),
                 ),
+                if (_isFetchingLocation) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Getting your current location…',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _returnToAirport,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => setState(() => _returnToAirport = value ?? false),
+                  title: const Text('Finish itinerary at CMB Airport'),
+                  subtitle: const Text(
+                    'Add a final transfer to Bandaranaike International Airport before departure.',
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
                 const SizedBox(height: 24),
                 _sectionTitle(context, 'Budget and travellers'),
                 TextFormField(
@@ -247,7 +407,10 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                             .toList(),
                         onChanged: isLoading
                             ? null
-                            : (value) => setState(() => _budgetLevel = value!),
+                            : (value) => setState(() {
+                                  _budgetLevel = value!;
+                                  _refreshBudgetDependentSelections();
+                                }),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -256,40 +419,70 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                         initialValue: _groupSize,
                         decoration: const InputDecoration(labelText: 'Travellers'),
                         items: List.generate(
-                          10,
+                          20,
                           (index) => DropdownMenuItem(
                             value: index + 1,
                             child: Text('${index + 1}'),
                           ),
                         ),
-                        onChanged: isLoading ? null : (value) => setState(() => _groupSize = value!),
+                        onChanged: isLoading
+                            ? null
+                            : (value) => setState(() {
+                                  _groupSize = value!;
+                                  _refreshBudgetDependentSelections();
+                                }),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                _sectionTitle(context, 'Places you want to experience'),
+                _sectionTitle(context, 'Select the regions you are going to travel'),
+                Text(
+                  'First select one or more travel regions. Then you can see the places and activities available for those regions.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 10),
                 _ChoiceChips(
-                  options: TripPreferenceOptions.interests,
-                  selected: _selectedInterests,
+                  options: TravelRegionOptions.regions,
+                  selected: _selectedTravelRegions,
                   enabled: !isLoading,
-                  onChanged: () => setState(() {}),
+                  onChanged: () => setState(_refreshRegionDependentSelections),
                 ),
                 const SizedBox(height: 24),
+                _sectionTitle(context, 'Places you want to experience'),
+                if (_selectedTravelRegions.isEmpty)
+                  Text(
+                    'Select a travel region first to see matching place types.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  )
+                else
+                  _ChoiceChips(
+                    options: _availableInterests,
+                    selected: _selectedInterests,
+                    enabled: !isLoading,
+                    onChanged: () => setState(_refreshRegionDependentSelections),
+                  ),
+                const SizedBox(height: 24),
                 _sectionTitle(context, 'Activities you want to do'),
-                _ChoiceChips(
-                  options: TripPreferenceOptions.activities,
-                  selected: _selectedActivities,
-                  enabled: !isLoading,
-                  onChanged: () => setState(() {}),
-                ),
+                if (_selectedTravelRegions.isEmpty || _selectedInterests.isEmpty)
+                  Text(
+                    'Select a region and at least one place type first to see matching activities.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  )
+                else
+                  _ChoiceChips(
+                    options: _availableActivities,
+                    selected: _selectedActivities,
+                    enabled: !isLoading,
+                    onChanged: () => setState(() {}),
+                  ),
                 const SizedBox(height: 24),
                 _sectionTitle(context, 'Travel style'),
                 _PreferenceDropdown(
                   label: 'Accommodation',
                   icon: Icons.hotel_outlined,
                   value: _accommodation,
-                  options: TripPreferenceOptions.accommodationTypes,
+                  options: _availableAccommodationTypes,
                   enabled: !isLoading,
                   onChanged: (value) => setState(() => _accommodation = value),
                 ),
@@ -304,10 +497,10 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                 ),
                 const SizedBox(height: 12),
                 _PreferenceDropdown(
-                  label: 'Transport',
+                  label: 'Transport strategy',
                   icon: Icons.directions_bus_outlined,
                   value: _transportMode,
-                  options: TripPreferenceOptions.transportModes,
+                  options: _availableTransportModes,
                   enabled: !isLoading,
                   onChanged: (value) => setState(() => _transportMode = value),
                 ),
@@ -346,7 +539,7 @@ class _TripPreferenceScreenState extends ConsumerState<TripPreferenceScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'This milestone uses a rule-based baseline. AI and live places integration come next.',
+                  'After the itinerary is generated, XGBoost predicts accommodation, food, transport and activity costs from the completed plan.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                   textAlign: TextAlign.center,
                 ),

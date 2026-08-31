@@ -21,11 +21,15 @@ public record GenerateItineraryRequest(
         @NotNull BudgetLevel budgetLevel,
         @NotNull @DecimalMin(value = "1.00") BigDecimal budgetLkr,
         @Min(1) @Max(20) int groupSize,
-        @NotEmpty @Size(max = 8) List<@NotBlank String> interests,
-        @Size(max = 10) List<@NotBlank String> activities,
+        @Size(max = 9) List<@NotBlank String> travelRegions,
+        @NotEmpty @Size(max = 20) List<@NotBlank String> interests,
+        @Size(max = 24) List<@NotBlank String> activities,
         @NotBlank @Size(max = 40) String accommodationType,
         @NotBlank @Size(max = 60) String foodPreference,
         @NotBlank @Size(max = 40) String transportMode,
         @NotBlank @Size(max = 30) String pace,
-        @Size(max = 500) String notes) {
+        @Size(max = 500) String notes,
+        Double latitude,
+        Double longitude,
+        boolean returnToAirport) {
 }

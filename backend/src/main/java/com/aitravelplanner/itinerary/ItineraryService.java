@@ -1,5 +1,6 @@
 package com.aitravelplanner.itinerary;
 
+import com.aitravelplanner.itinerary.dto.AlternativePlaceResponse;
 import com.aitravelplanner.itinerary.dto.CostSummaryResponse;
 import com.aitravelplanner.itinerary.dto.GenerateItineraryRequest;
 import com.aitravelplanner.itinerary.dto.ItineraryDayResponse;
@@ -21,16 +22,25 @@ public class ItineraryService {
     private final UserRepository userRepository;
     private final TripRepository tripRepository;
     private final ItineraryGenerator generator;
+    private final NationwidePlaceCatalog nationwideCatalog;
+    private final TransportPlanner transportPlanner;
+    private final AccommodationCatalog accommodationCatalog;
     private final BigDecimal lkrPerUsd;
 
     public ItineraryService(
             UserRepository userRepository,
             TripRepository tripRepository,
             ItineraryGenerator generator,
+            NationwidePlaceCatalog nationwideCatalog,
+            TransportPlanner transportPlanner,
+            AccommodationCatalog accommodationCatalog,
             @Value("${app.currency.lkr-per-usd:310.00}") BigDecimal lkrPerUsd) {
         this.userRepository = userRepository;
         this.tripRepository = tripRepository;
         this.generator = generator;
+        this.nationwideCatalog = nationwideCatalog;
+        this.transportPlanner = transportPlanner;
+        this.accommodationCatalog = accommodationCatalog;
         this.lkrPerUsd = lkrPerUsd;
     }
 
@@ -58,6 +68,11 @@ public class ItineraryService {
                 request.interests(),
                 activities,
                 lkrPerUsd);
+
+        if (request.latitude() != null && request.longitude() != null) {
+            trip.setDestinationLatitude(request.latitude());
+            trip.setDestinationLongitude(request.longitude());
+        }
 
         ItineraryGenerator.GenerationTotals totals = generator.generate(trip, request);
         trip.complete(totals.accommodation(), totals.food(), totals.transport(), totals.activities());
@@ -107,10 +122,20 @@ public class ItineraryService {
                                         item.getDescription(),
                                         item.getLocation(),
                                         item.getTravelMinutes(),
+                                        itemVisitMinutes(item),
                                         item.getDistanceKm(),
                                         item.getEstimatedCostLkr(),
                                         toUsd(item.getEstimatedCostLkr(), trip.getLkrPerUsd()),
-                                        item.getAlternatives(),
+                                        item.getAlternatives().stream()
+                                                .map(name -> alternativeResponse(item, name, trip))
+                                                .filter(java.util.Objects::nonNull)
+                                                .toList(),
+                                        transportPlanner.options(
+                                                item.getSourceReference(),
+                                                item.getLocation(),
+                                                item.getDistanceKm(),
+                                                trip.getGroupSize(),
+                                                trip.getBudgetLevel()),
                                         item.getLatitude(),
                                         item.getLongitude(),
                                         item.getDataSource(),
@@ -154,6 +179,101 @@ public class ItineraryService {
                 costSummary,
                 days,
                 trip.getCreatedAt());
+    }
+
+
+    private AlternativePlaceResponse alternativeResponse(ItineraryItem current, String name, Trip trip) {
+        var place = nationwideCatalog.findByName(name);
+        if (place.isPresent()) {
+            var candidate = place.get();
+            BigDecimal distance = alternativeDistance(current, candidate);
+            BigDecimal cost = nationwideCatalog.estimatedActivityCost(candidate, trip.getBudgetLevel())
+                    .multiply(BigDecimal.valueOf(trip.getGroupSize()));
+            return new AlternativePlaceResponse(
+                    candidate.place().name(),
+                    candidate.place().category(),
+                    ShortDescription.limit(candidate.place().description(), 40),
+                    candidate.region(),
+                    alternativeTravelMinutes(current, candidate, trip.getTransportMode()),
+                    generator.activityDurationMinutes(candidate),
+                    distance,
+                    cost,
+                    toUsd(cost, trip.getLkrPerUsd()),
+                    transportPlanner.options(candidate.place().sourceReference(), candidate.region(), distance,
+                            trip.getGroupSize(), trip.getBudgetLevel()),
+                    candidate.place().latitude(), candidate.place().longitude(),
+                    candidate.place().dataSource(), candidate.place().sourceReference(), candidate.place().sourceUrl());
+        }
+
+        var stay = accommodationCatalog.findByName(name, trip.getBudgetLevel(), trip.getGroupSize());
+        if (stay.isPresent()) {
+            var option = stay.get();
+            BigDecimal distance = accommodationDistance(current, option);
+            int travel = accommodationTravelMinutes(distance, trip.getTransportMode());
+            return new AlternativePlaceResponse(
+                    option.name(),
+                    "Accommodation",
+                    "Alternative nearby overnight stay: " + option.type() + ". " + option.address()
+                            + ". Confirm live room availability and price before booking.",
+                    option.address(),
+                    travel,
+                    60,
+                    distance,
+                    option.estimatedNightCostLkr(),
+                    toUsd(option.estimatedNightCostLkr(), trip.getLkrPerUsd()),
+                    transportPlanner.options(null, option.address(), distance, trip.getGroupSize(), trip.getBudgetLevel()),
+                    option.latitude(), option.longitude(),
+                    "SRI_LANKA_OPEN_DATA", null, null);
+        }
+        return null;
+    }
+
+    private BigDecimal accommodationDistance(
+            ItineraryItem current, AccommodationCatalog.AccommodationOption option) {
+        if (current.getLatitude() == null || current.getLongitude() == null) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(NationwidePlaceCatalog.distanceKm(
+                        current.getLatitude(), current.getLongitude(), option.latitude(), option.longitude()) * 1.22)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int accommodationTravelMinutes(BigDecimal distance, String transportMode) {
+        if (distance.signum() <= 0) return 0;
+        String mode = transportMode == null ? "" : transportMode.toLowerCase(java.util.Locale.ROOT);
+        double speed = mode.contains("public") || mode.contains("bus") || mode.contains("train") ? 32.0
+                : mode.contains("tuk") ? 28.0 : 42.0;
+        return Math.max(10, (int) Math.ceil(distance.doubleValue() / speed * 60));
+    }
+
+
+    private int itemVisitMinutes(ItineraryItem item) {
+        int start = item.getStartTime().toSecondOfDay() / 60;
+        int end = item.getEndTime().toSecondOfDay() / 60;
+        int duration = end - start;
+        if (duration < 0) duration += 24 * 60;
+        return Math.max(0, duration);
+    }
+
+    private BigDecimal alternativeDistance(ItineraryItem current, NationwidePlaceCatalog.TravelCandidate alternative) {
+        if (current.getLatitude() == null || current.getLongitude() == null
+                || alternative.place().latitude() == null || alternative.place().longitude() == null) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(NationwidePlaceCatalog.distanceKm(
+                        current.getLatitude(), current.getLongitude(),
+                        alternative.place().latitude(), alternative.place().longitude()) * 1.22)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int alternativeTravelMinutes(
+            ItineraryItem current,
+            NationwidePlaceCatalog.TravelCandidate alternative,
+            String transportMode) {
+        BigDecimal distance = alternativeDistance(current, alternative);
+        if (distance.signum() <= 0) return 0;
+        String mode = transportMode == null ? "" : transportMode.toLowerCase(java.util.Locale.ROOT);
+        double speed = mode.contains("public") || mode.contains("bus") || mode.contains("train") ? 32.0
+                : mode.contains("tuk") ? 28.0 : 42.0;
+        return Math.max(10, (int) Math.ceil(distance.doubleValue() / speed * 60));
     }
 
     private BigDecimal toUsd(BigDecimal lkr, BigDecimal rate) {
