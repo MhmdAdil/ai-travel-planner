@@ -75,11 +75,11 @@ class ItineraryControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.destinationRegion").value("Kandy"))
-                .andExpect(jsonPath("$.generatorType").value("FALLBACK_CATALOG"))
+                .andExpect(jsonPath("$.generatorType").value("OPENSTREETMAP_PREFERENCE_ROUTE"))
                 .andExpect(jsonPath("$.providerNote").isNotEmpty())
                 .andExpect(jsonPath("$.days.length()").value(3))
                 .andExpect(jsonPath("$.days[0].items[0].name").isNotEmpty())
-                .andExpect(jsonPath("$.days[0].items[0].dataSource").value("FALLBACK_CATALOG"))
+                .andExpect(jsonPath("$.days[0].items[0].dataSource").value("OPENSTREETMAP_OFFLINE"))
                 .andExpect(jsonPath("$.costSummary.totalLkr").isNumber())
                 .andExpect(jsonPath("$.costSummary.totalUsd").isNumber())
                 .andExpect(jsonPath("$.costSummary.lkrPerUsd").value(310.0));
@@ -97,19 +97,26 @@ class ItineraryControllerIntegrationTest {
     }
 
     private String registerAndLogin() throws Exception {
-        String credentials = "{\"email\":\"planner@example.com\",\"password\":\"secret123\"}";
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(credentials))
-                .andExpect(status().isCreated());
-        String response = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(credentials))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        JsonNode json = objectMapper.readTree(response);
-        return json.get("token").asText();
-    }
+    String registerCredentials =
+            "{\"username\":\"planner01\",\"email\":\"planner@example.com\",\"password\":\"secret123\"}";
+
+    String loginCredentials =
+            "{\"email\":\"planner@example.com\",\"password\":\"secret123\"}";
+
+    mockMvc.perform(post("/api/auth/register")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(registerCredentials))
+            .andExpect(status().isCreated());
+
+    String response = mockMvc.perform(post("/api/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(loginCredentials))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    JsonNode json = objectMapper.readTree(response);
+    return json.get("token").asText();
+}
 }

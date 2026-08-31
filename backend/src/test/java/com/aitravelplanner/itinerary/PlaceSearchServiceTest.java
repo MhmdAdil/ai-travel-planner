@@ -33,7 +33,7 @@ class PlaceSearchServiceTest {
                 List.of(livePlace)));
 
         PlaceSearchResult result = new PlaceSearchService(osmPlaceClient, fallbackCatalog, true)
-                .findPlaces("Kandy");
+                .findPlaces("Kandy", null, null);
 
         assertThat(result.generatorType()).isEqualTo("OPENSTREETMAP_LIVE");
         assertThat(result.places()).containsExactly(livePlace);
@@ -45,7 +45,7 @@ class PlaceSearchServiceTest {
         when(osmPlaceClient.find("Kandy")).thenThrow(new PlaceProviderException("Unavailable"));
 
         PlaceSearchResult result = new PlaceSearchService(osmPlaceClient, fallbackCatalog, true)
-                .findPlaces("Kandy");
+                .findPlaces("Kandy", null, null);
 
         assertThat(result.generatorType()).isEqualTo("FALLBACK_CATALOG");
         assertThat(result.places()).isNotEmpty();
