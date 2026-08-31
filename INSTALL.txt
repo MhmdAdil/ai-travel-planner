@@ -1,0 +1,7 @@
+FAST ITINERARY PATCH
+
+Copy the backend folder into:
+C:\Users\adilm\Projects\ai-travel-planner
+Choose Replace files in destination.
+
+This keeps the full dataset but limits runtime recommendation work to a 1,200-place matched shortlist and prevents the end-of-day loop from rescanning thousands of impossible candidates.
