@@ -1,0 +1,21 @@
+column,role,description
+duration_days,feature,Trip duration in days
+travellers,feature,Number of travellers
+budget_lkr,feature,User-entered total budget
+budget_level,feature,LOW/MID/HIGH
+accommodation_type,feature,Selected accommodation style
+food_preference,feature,Selected food style
+transport_mode,feature,Public/Mixed/Private
+pace,feature,Relaxed/Balanced/Fast
+region_count,feature,Number of Sri Lanka travel regions
+place_count,feature,Number of itinerary places
+activity_count,feature,Number of planned activities
+route_distance_km,feature,Estimated route distance
+estimated_travel_hours,feature,Estimated transport hours
+nights,feature,Number of overnight stays
+rooms,feature,Estimated rooms required
+accommodation_cost_lkr,target,Accommodation cost label
+food_cost_lkr,target,Food cost label
+transport_cost_lkr,target,Transport cost label
+activities_cost_lkr,target,Activity cost label
+total_cost_lkr,derived target,Sum of component labels

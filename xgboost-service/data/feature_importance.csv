@@ -1,0 +1,81 @@
+model,rank,feature,importance
+accommodation_cost_lkr,1,accommodation_type_Resort/Luxury,0.21951450407505035
+accommodation_cost_lkr,2,budget_lkr,0.16183316707611084
+accommodation_cost_lkr,3,budget_level_HIGH,0.10596544295549393
+accommodation_cost_lkr,4,accommodation_type_Boutique hotel,0.0750918984413147
+accommodation_cost_lkr,5,accommodation_type_Budget hotel,0.07227775454521179
+accommodation_cost_lkr,6,accommodation_type_Hostel/Guesthouse,0.06818029284477234
+accommodation_cost_lkr,7,accommodation_type_Mid-range hotel,0.06777989119291306
+accommodation_cost_lkr,8,duration_days,0.05099321901798248
+accommodation_cost_lkr,9,rooms,0.04883980005979538
+accommodation_cost_lkr,10,travellers,0.037530869245529175
+accommodation_cost_lkr,11,budget_level_LOW,0.0325256772339344
+accommodation_cost_lkr,12,nights,0.015683956444263458
+accommodation_cost_lkr,13,budget_level_MID,0.009381823241710663
+accommodation_cost_lkr,14,place_count,0.005750701762735844
+accommodation_cost_lkr,15,region_count,0.002259698696434498
+accommodation_cost_lkr,16,activity_count,0.001442648470401764
+accommodation_cost_lkr,17,has_safari,0.0012328067095950246
+accommodation_cost_lkr,18,estimated_travel_hours,0.0011839779326692224
+accommodation_cost_lkr,19,route_distance_km,0.0011553216027095914
+accommodation_cost_lkr,20,has_shopping,0.0011462158290669322
+food_cost_lkr,1,food_preference_Premium,0.24163182079792023
+food_cost_lkr,2,budget_lkr,0.18125595152378082
+food_cost_lkr,3,food_preference_Cafe/Restaurant,0.07552337646484375
+food_cost_lkr,4,food_preference_Sri Lankan,0.07497911155223846
+food_cost_lkr,5,food_preference_Local budget,0.07436048239469528
+food_cost_lkr,6,budget_level_HIGH,0.06995729357004166
+food_cost_lkr,7,food_preference_Mixed,0.06345715373754501
+food_cost_lkr,8,duration_days,0.0389103926718235
+food_cost_lkr,9,travellers,0.037894174456596375
+food_cost_lkr,10,rooms,0.035045329481363297
+food_cost_lkr,11,budget_level_LOW,0.03293401002883911
+food_cost_lkr,12,budget_level_MID,0.029456734657287598
+food_cost_lkr,13,nights,0.013747707940638065
+food_cost_lkr,14,place_count,0.003712607780471444
+food_cost_lkr,15,activity_count,0.0012939126463606954
+food_cost_lkr,16,estimated_travel_hours,0.0012221988290548325
+food_cost_lkr,17,has_history,0.001206793007440865
+food_cost_lkr,18,route_distance_km,0.0011700561735779047
+food_cost_lkr,19,has_adventure,0.0011158391134813428
+food_cost_lkr,20,region_count,0.0010875739390030503
+transport_cost_lkr,1,transport_mode_Public transport,0.4006973206996918
+transport_cost_lkr,2,transport_mode_Mixed,0.11445710808038712
+transport_cost_lkr,3,rooms,0.0929676964879036
+transport_cost_lkr,4,route_distance_km,0.08682931959629059
+transport_cost_lkr,5,budget_lkr,0.08551239967346191
+transport_cost_lkr,6,transport_mode_Private vehicle,0.07373429834842682
+transport_cost_lkr,7,travellers,0.07307819277048111
+transport_cost_lkr,8,estimated_travel_hours,0.013438712805509567
+transport_cost_lkr,9,budget_level_HIGH,0.0046731820330023766
+transport_cost_lkr,10,nights,0.0032655871473252773
+transport_cost_lkr,11,duration_days,0.002930763643234968
+transport_cost_lkr,12,budget_level_LOW,0.0027378269005566835
+transport_cost_lkr,13,place_count,0.0026689330115914345
+transport_cost_lkr,14,budget_level_MID,0.002022267086431384
+transport_cost_lkr,15,activity_count,0.001747539034113288
+transport_cost_lkr,16,has_swimming,0.0017288548406213522
+transport_cost_lkr,17,has_nature,0.0017140352865681052
+transport_cost_lkr,18,region_count,0.001709464704617858
+transport_cost_lkr,19,food_preference_Sri Lankan,0.0016661679837852716
+transport_cost_lkr,20,has_history,0.0016271952772513032
+activities_cost_lkr,1,rooms,0.29953834414482117
+activities_cost_lkr,2,has_safari,0.2611367404460907
+activities_cost_lkr,3,travellers,0.17076805233955383
+activities_cost_lkr,4,activity_count,0.07201094925403595
+activities_cost_lkr,5,has_surfing,0.05487537756562233
+activities_cost_lkr,6,duration_days,0.016413405537605286
+activities_cost_lkr,7,budget_level_MID,0.013886927627027035
+activities_cost_lkr,8,budget_level_HIGH,0.011885193176567554
+activities_cost_lkr,9,has_food_tour,0.010259008966386318
+activities_cost_lkr,10,has_hiking,0.009480861015617847
+activities_cost_lkr,11,budget_lkr,0.0074988617561757565
+activities_cost_lkr,12,has_culture,0.0058131166733801365
+activities_cost_lkr,13,has_cycling,0.0053470553830266
+activities_cost_lkr,14,has_history,0.004759376402944326
+activities_cost_lkr,15,has_shopping,0.004332240205258131
+activities_cost_lkr,16,has_swimming,0.0038258139975368977
+activities_cost_lkr,17,nights,0.0037320656701922417
+activities_cost_lkr,18,place_count,0.0025154936593025923
+activities_cost_lkr,19,route_distance_km,0.0022158361971378326
+activities_cost_lkr,20,estimated_travel_hours,0.002143197925761342
