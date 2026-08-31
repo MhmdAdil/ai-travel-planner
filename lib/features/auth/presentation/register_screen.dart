@@ -15,6 +15,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -22,6 +23,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -32,6 +34,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final l10n = AppLocalizations.of(context)!;
     if (!_formKey.currentState!.validate()) return;
     final success = await ref.read(authControllerProvider.notifier).register(
+      username: _usernameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
@@ -70,6 +73,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 32),
+                  TextFormField(
+                    controller: _usernameController,
+                    autofillHints: const [AutofillHints.username],
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      prefixIcon: Icon(Icons.person_outline),
+                      helperText: '3-30 characters. Letters, numbers, dot, underscore or hyphen.',
+                    ),
+                    validator: (value) {
+                      final username = value?.trim() ?? '';
+                      if (username.length < 3 || username.length > 30) {
+                        return 'Username must be between 3 and 30 characters.';
+                      }
+                      if (!RegExp(r'^[A-Za-z0-9._-]+$').hasMatch(username)) {
+                        return 'Use letters, numbers, dot, underscore or hyphen only.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,

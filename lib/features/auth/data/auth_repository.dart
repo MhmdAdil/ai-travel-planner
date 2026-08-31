@@ -22,9 +22,17 @@ class AuthRepository {
     }
   }
 
-  Future<void> register({required String email, required String password}) async {
+  Future<void> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
     try {
-      await _apiService.register(email: email, password: password);
+      await _apiService.register(
+        username: username,
+        email: email,
+        password: password,
+      );
     } on DioException catch (e) {
       throw AuthException(_messageFor(e));
     }
@@ -39,7 +47,9 @@ class AuthRepository {
       case 401:
         return 'Invalid email or password.';
       case 409:
-        return 'An account with that email already exists.';
+        return data is Map && data['message'] is String
+            ? data['message'] as String
+            : 'That email or username is already in use.';
       default:
         return e.type == DioExceptionType.connectionError ||
                 e.type == DioExceptionType.connectionTimeout

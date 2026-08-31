@@ -36,10 +36,18 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<bool> register({required String email, required String password}) async {
+  Future<bool> register({
+    required String username,
+    required String email,
+    required String password,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      await ref.read(authRepositoryProvider).register(email: email, password: password);
+      await ref.read(authRepositoryProvider).register(
+            username: username,
+            email: email,
+            password: password,
+          );
       state = state.copyWith(isLoading: false, status: AuthStatus.unauthenticated);
       return true;
     } on AuthException catch (e) {
