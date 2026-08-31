@@ -9,7 +9,10 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
+import '../../features/home/presentation/help_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/how_to_use_screen.dart';
+import '../../features/home/presentation/travel_rules_screen.dart';
 import '../../features/itinerary/presentation/itinerary_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import 'scaffold_with_nav_bar.dart';
@@ -68,6 +71,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const HomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'help',
+                    builder: (context, state) => const HelpScreen(),
+                  ),
+                  GoRoute(
+                    path: 'rules',
+                    builder: (context, state) => const TravelRulesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'how-to-use',
+                    builder: (context, state) => const HowToUseScreen(),
+                  ),
+                ],
               ),
             ],
           ),
