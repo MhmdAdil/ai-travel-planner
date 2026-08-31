@@ -37,12 +37,20 @@ public class AuthService {
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
+        String username = request.username().trim();
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailAlreadyExistsException();
         }
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new UsernameAlreadyExistsException();
+        }
 
         AppUser user = userRepository.save(
-                new AppUser(email, passwordEncoder.encode(request.password()), Role.TRAVELLER));
+                new AppUser(
+                        email,
+                        username,
+                        passwordEncoder.encode(request.password()),
+                        Role.TRAVELLER));
         return new RegisterResponse("Account created successfully.", UserSummaryResponse.from(user));
     }
 

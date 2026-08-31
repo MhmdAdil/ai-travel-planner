@@ -42,9 +42,10 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"Traveller@Example.com","password":"secret123"}
+                                {"username":"traveller01","email":"Traveller@Example.com","password":"secret123"}
                                 """))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.user.username").value("traveller01"))
                 .andExpect(jsonPath("$.user.email").value("traveller@example.com"))
                 .andExpect(jsonPath("$.user.role").value("TRAVELLER"));
 
@@ -61,14 +62,27 @@ class AuthControllerIntegrationTest {
 
     @Test
     void rejectsDuplicateEmailIgnoringCase() throws Exception {
-        String first = "{\"email\":\"user@example.com\",\"password\":\"secret123\"}";
-        String duplicate = "{\"email\":\"USER@example.com\",\"password\":\"secret123\"}";
+        String first = "{\"username\":\"userone\",\"email\":\"user@example.com\",\"password\":\"secret123\"}";
+        String duplicate = "{\"username\":\"usertwo\",\"email\":\"USER@example.com\",\"password\":\"secret123\"}";
 
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(first))
                 .andExpect(status().isCreated());
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(duplicate))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("An account with that email already exists."));
+    }
+
+    @Test
+    void rejectsDuplicateUsernameIgnoringCase() throws Exception {
+        String first = "{\"username\":\"AdilTraveller\",\"email\":\"one@example.com\",\"password\":\"secret123\"}";
+        String duplicate = "{\"username\":\"adiltraveller\",\"email\":\"two@example.com\",\"password\":\"secret123\"}";
+
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(first))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(duplicate))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        "That username is already in use. Please choose another username."));
     }
 
     @Test

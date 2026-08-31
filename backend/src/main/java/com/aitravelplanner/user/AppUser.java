@@ -13,7 +13,12 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 
 @Entity
-@Table(name = "app_users", uniqueConstraints = @UniqueConstraint(name = "uk_app_users_email", columnNames = "email"))
+@Table(
+        name = "app_users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_app_users_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_app_users_username", columnNames = "username")
+        })
 public class AppUser {
 
     @Id
@@ -22,6 +27,9 @@ public class AppUser {
 
     @Column(nullable = false, length = 320)
     private String email;
+
+    @Column(length = 30)
+    private String username;
 
     @Column(name = "password_hash", nullable = false, length = 100)
     private String passwordHash;
@@ -36,8 +44,9 @@ public class AppUser {
     protected AppUser() {
     }
 
-    public AppUser(String email, String passwordHash, Role role) {
+    public AppUser(String email, String username, String passwordHash, Role role) {
         this.email = email;
+        this.username = username;
         this.passwordHash = passwordHash;
         this.role = role;
     }
@@ -47,23 +56,13 @@ public class AppUser {
         createdAt = Instant.now();
     }
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public String getEmail() { return email; }
+    public String getUsername() { return username; }
+    public String getPasswordHash() { return passwordHash; }
+    public Role getRole() { return role; }
+    public Instant getCreatedAt() { return createdAt; }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+    public void changeUsername(String username) { this.username = username; }
+    public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 }

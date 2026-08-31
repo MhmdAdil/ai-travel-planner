@@ -1,6 +1,8 @@
 package com.aitravelplanner.common;
 
 import com.aitravelplanner.auth.EmailAlreadyExistsException;
+import com.aitravelplanner.auth.UsernameAlreadyExistsException;
+import com.aitravelplanner.profile.IncorrectCurrentPasswordException;
 import com.aitravelplanner.itinerary.InvalidTripRequestException;
 import com.aitravelplanner.itinerary.PlaceProviderException;
 import com.aitravelplanner.itinerary.TripNotFoundException;
@@ -25,10 +27,22 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
     }
 
+    @ExceptionHandler(UsernameAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    ApiError handleDuplicateUsername(UsernameAlreadyExistsException exception) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), Map.of());
+    }
+
+    @ExceptionHandler(IncorrectCurrentPasswordException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    ApiError handleIncorrectCurrentPassword(IncorrectCurrentPasswordException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     ApiError handleDataIntegrityViolation() {
-        return error(HttpStatus.CONFLICT, "An account with that email already exists.", Map.of());
+        return error(HttpStatus.CONFLICT, "That email or username is already in use.", Map.of());
     }
 
     @ExceptionHandler(BadCredentialsException.class)
