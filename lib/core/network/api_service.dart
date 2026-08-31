@@ -20,19 +20,29 @@ class ApiService {
   }
 
   Future<Response<dynamic>> register({
+    required String username,
     required String email,
     required String password,
   }) {
     return _dio.post(
       ApiConfig.registerPath,
-      data: {'email': email, 'password': password},
+      data: {'username': username, 'email': email, 'password': password},
     );
   }
 
-  Future<Response<dynamic>> generateItinerary(Map<String, dynamic> preferences) {
+  Future<Response<dynamic>> generateItinerary(
+    Map<String, dynamic> preferences,
+  ) {
     return _dio.post(
       ApiConfig.generateItineraryPath,
       data: preferences,
+    );
+  }
+
+  Future<Response<dynamic>> predictCost(Map<String, dynamic> request) {
+    return _dio.post(
+      ApiConfig.costPredictionPath,
+      data: request,
     );
   }
 
@@ -71,6 +81,34 @@ class ApiService {
         'endLat': endLat,
         'endLng': endLng,
       },
+    );
+  }
+
+  Future<Response<dynamic>> getProfile() {
+    return _dio.get(ApiConfig.profilePath);
+  }
+
+  Future<Response<dynamic>> updateUsername(String username) {
+    return _dio.patch(
+      ApiConfig.profileUsernamePath,
+      data: {'username': username},
+    );
+  }
+
+  Future<Response<dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return _dio.patch(
+      ApiConfig.profilePasswordPath,
+      data: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+  }
+
+  Future<Response<dynamic>> sendChatMessage(Map<String, dynamic> payload) {
+    return _dio.post(
+      ApiConfig.chatMessagePath,
+      data: payload,
     );
   }
 }

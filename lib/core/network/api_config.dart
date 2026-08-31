@@ -15,4 +15,9 @@ class ApiConfig {
   static const String itinerariesPath = '/api/itinerary';
   static const String nearbyPlacesPath = '/api/places/nearby';
   static const String placeRoutePath = '/api/places/route';
+  static const String costPredictionPath = '/api/cost/predict';
+  static const String chatMessagePath = '/api/chat/message';
+  static const String profilePath = '/api/profile';
+  static const String profileUsernamePath = '/api/profile/username';
+  static const String profilePasswordPath = '/api/profile/password';
 }
