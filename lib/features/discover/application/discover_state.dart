@@ -32,10 +32,13 @@ class DiscoverState {
             place.dataSource == 'OPENSTREETMAP_OFFLINE' ||
             place.dataSource == 'CURATED_OPEN_DATA',
       );
-  List<Place> get visiblePlaces => places
-      .where((place) => place.distanceKm <= radiusKm)
-      .where((place) => matchesDiscoverActivityFilters(place.category, selectedActivityFilters))
-      .toList(growable: false);
+  List<Place> get visiblePlaces {
+    if (selectedActivityFilters.isEmpty) return const [];
+    return places
+        .where((place) => place.distanceKm <= radiusKm)
+        .where((place) => matchesDiscoverActivityFilters(place.category, selectedActivityFilters))
+        .toList(growable: false);
+  }
 
   DiscoverState copyWith({
     LatLng? center,

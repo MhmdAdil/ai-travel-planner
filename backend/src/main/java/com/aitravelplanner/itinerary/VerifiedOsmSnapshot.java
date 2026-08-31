@@ -58,6 +58,20 @@ final class VerifiedOsmSnapshot {
         return PLACES.size();
     }
 
+    static List<PlaceTemplate> allPlaces() {
+        List<PlaceTemplate> result = new ArrayList<>(PLACES.size());
+        for (VerifiedPlace place : PLACES) {
+            result.add(new PlaceTemplate(
+                    place.name(), place.category(), ShortDescription.limit(place.description(), 40), place.address(),
+                    visitMinutes(place.category()), BigDecimal.ZERO, BigDecimal.ZERO,
+                    place.latitude(), place.longitude(), place.dataSource(),
+                    place.sourceReference(), place.sourceUrl(), safe(place.openingHours()),
+                    safe(place.website()), safe(place.phone()), safeOr(place.feeStatus(), "UNKNOWN"),
+                    safeOr(place.feeDetails(), "Price: not published by the source.")));
+        }
+        return List.copyOf(result);
+    }
+
     private static boolean matchesFilter(String category, Set<String> normalizedFilters) {
         if (normalizedFilters.isEmpty()) return true;
         String normalizedCategory = category.toLowerCase(Locale.ROOT);

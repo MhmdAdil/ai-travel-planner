@@ -349,7 +349,7 @@ class _ActivityFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = selectedFilters.isEmpty
-        ? 'All nearby activities'
+        ? 'Select activities to show places'
         : '${selectedFilters.join(', ')} ($visibleCount)';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -392,7 +392,7 @@ class _ActivityFilterSheetState extends State<_ActivityFilterSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Select one or more types. Clear all to show every activity.',
+              'Select one or more types to show matching places. Clear all to return to the map-only view.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
             ),
             const SizedBox(height: 16),

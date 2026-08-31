@@ -44,14 +44,30 @@ class DiscoverController extends Notifier<DiscoverState> {
       usingDeviceLocation: location.granted,
       places: centerChanged ? const [] : state.places,
     );
+    if (state.selectedActivityFilters.isEmpty) {
+      state = state.copyWith(
+        status: DiscoverStatus.loaded,
+        errorMessage: null,
+        places: const [],
+      );
+      return;
+    }
     await fetchPlaces();
   }
 
   Future<void> setRadius(double radiusKm) async {
     if (state.radiusKm == radiusKm) return;
     state = state.copyWith(radiusKm: radiusKm);
-    // Keep one stable map centre while comparing radii. Refreshing GPS here can move the
-    // centre slightly and makes a 10 km search incomparable with the preceding 5 km search.
+    // Keep one stable map centre while comparing radii. With no selected
+    // activity, keep Discover as a clean map-only view.
+    if (state.selectedActivityFilters.isEmpty) {
+      state = state.copyWith(
+        status: DiscoverStatus.loaded,
+        errorMessage: null,
+        places: const [],
+      );
+      return;
+    }
     await fetchPlaces();
   }
 
@@ -59,10 +75,29 @@ class DiscoverController extends Notifier<DiscoverState> {
 
   Future<void> applyActivityFilters(Set<String> filters) async {
     state = state.copyWith(selectedActivityFilters: Set.unmodifiable(filters));
+    if (filters.isEmpty) {
+      _requestGeneration++;
+      state = state.copyWith(
+        status: DiscoverStatus.loaded,
+        errorMessage: null,
+        places: const [],
+      );
+      return;
+    }
     await fetchPlaces();
   }
 
   Future<void> fetchPlaces() async {
+    if (state.selectedActivityFilters.isEmpty) {
+      _requestGeneration++;
+      state = state.copyWith(
+        status: DiscoverStatus.loaded,
+        errorMessage: null,
+        places: const [],
+      );
+      return;
+    }
+
     if (state.locationDenied) {
       state = state.copyWith(
         status: DiscoverStatus.loaded,
@@ -200,9 +235,12 @@ class DiscoverController extends Notifier<DiscoverState> {
       locationDenied: false,
       usingDeviceLocation: true,
       places: const [],
-      status: DiscoverStatus.loading,
+      status: state.selectedActivityFilters.isEmpty
+          ? DiscoverStatus.loaded
+          : DiscoverStatus.loading,
       errorMessage: null,
     );
+    if (state.selectedActivityFilters.isEmpty) return;
     await fetchPlaces();
   }
 
