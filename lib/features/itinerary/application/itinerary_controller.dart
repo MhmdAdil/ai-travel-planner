@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/itinerary_exception.dart';
 import '../data/itinerary_repository.dart';
+import '../data/models/itinerary.dart';
 import '../data/models/trip_preference.dart';
 import 'itinerary_state.dart';
 
@@ -34,6 +35,22 @@ class ItineraryController extends Notifier<ItineraryState> {
     if (itinerary == null) return;
     state = state.copyWith(
       itinerary: itinerary.withItemRemoved(dayIndex: dayIndex, itemIndex: itemIndex),
+    );
+  }
+
+  void useAlternative({
+    required int dayIndex,
+    required int itemIndex,
+    required AlternativePlace alternative,
+  }) {
+    final itinerary = state.itinerary;
+    if (itinerary == null) return;
+    state = state.copyWith(
+      itinerary: itinerary.withAlternative(
+        dayIndex: dayIndex,
+        itemIndex: itemIndex,
+        alternative: alternative,
+      ),
     );
   }
 

@@ -13,12 +13,14 @@ void main() {
       budgetLevel: 'MID',
       budgetLkr: 150000,
       groupSize: 2,
+      travelRegions: const ['Upcountry / Central Highlands'],
       interests: const ['Culture'],
       activities: const ['Hiking'],
       accommodationType: 'Mid-range hotel',
       foodPreference: 'Sri Lankan',
       transportMode: 'Public transport',
       pace: 'Balanced',
+      returnToAirport: false,
     );
 
     expect(preference.durationDays, 3);
@@ -68,7 +70,21 @@ void main() {
               'distanceKm': 2,
               'estimatedCostLkr': 3000,
               'estimatedCostUsd': 9.68,
-              'alternatives': ['Kandy Lake Walk'],
+              'alternatives': [
+                {
+                  'name': 'Kandy Lake Walk',
+                  'category': 'Nature',
+                  'description': 'Walk around the lake.',
+                  'location': 'Kandy',
+                  'estimatedCostLkr': 0,
+                  'estimatedCostUsd': 0,
+                  'latitude': 7.292,
+                  'longitude': 80.642,
+                  'dataSource': 'OPENSTREETMAP',
+                  'sourceReference': 'way/456',
+                  'sourceUrl': 'https://www.openstreetmap.org/way/456',
+                },
+              ],
               'latitude': 7.2936,
               'longitude': 80.6413,
               'dataSource': 'OPENSTREETMAP',
@@ -81,7 +97,7 @@ void main() {
     });
 
     expect(itinerary.days, hasLength(1));
-    expect(itinerary.days.first.items.first.alternatives, ['Kandy Lake Walk']);
+    expect(itinerary.days.first.items.first.alternatives.first.name, 'Kandy Lake Walk');
     expect(itinerary.costSummary.totalLkr, 30000);
     expect(itinerary.costSummary.totalUsd, 96.77);
     expect(itinerary.generatorType, 'OPENSTREETMAP_LIVE');
